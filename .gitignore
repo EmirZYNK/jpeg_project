@@ -1,2 +1,19 @@
 __pycache__/
 *.pyc
+
+# Python sanal ortam klasörü 
+venv/
+.venv/
+env/
+
+# Python önbellek dosyaları
+__pycache__/
+*.py[cod]
+
+# İşletim sistemi dosyaları
+.DS_Store
+Thumbs.db
+
+# IDE ayarları
+.vscode/
+.idea/

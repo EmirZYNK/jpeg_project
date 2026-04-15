@@ -1,0 +1,8 @@
+# venv'i oluştur (Sanal Ortam)
+python -m venv venv
+
+# Sanal ortamı aktif et (Başında (venv) yazısı çıkacak)
+.\venv\Scripts\activate
+
+# TÜM Kütüphaneler
+python -m pip install flask flask-cors numpy opencv-python PyWavelets matplotlib scipy
