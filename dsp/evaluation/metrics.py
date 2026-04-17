@@ -65,34 +65,3 @@ def calculate_psnr(original: np.ndarray, decoded: np.ndarray) -> float:
     psnr = 10.0 * np.log10(1.0 / mse)
     return float(psnr)
 
-
-if __name__ == "__main__":
-    # ---------- Test Bloğu ----------
-    rng = np.random.default_rng(seed=42)
-
-    # 512×512 boyutunda normalize float32 test görüntüleri
-    original = rng.random((512, 512), dtype=np.float32)
-    decoded = rng.random((512, 512), dtype=np.float32)
-
-    mse_val = calculate_mse(original, decoded)
-    psnr_val = calculate_psnr(original, decoded)
-
-    print("=" * 45)
-    print("  CENG 384 – Görüntü Kalite Metrikleri Testi")
-    print("=" * 45)
-    print(f"  Görüntü boyutu : 512 × 512")
-    print(f"  MSE             : {mse_val:.6f}")
-    print(f"  PSNR            : {psnr_val:.2f} dB")
-    print(f"  MSE tipi        : {type(mse_val).__name__}")
-    print(f"  PSNR tipi       : {type(psnr_val).__name__}")
-    print("-" * 45)
-
-    # Mükemmel eşleşme testi (MSE == 0 → PSNR == inf)
-    identical = original.copy()
-    mse_zero = calculate_mse(original, identical)
-    psnr_inf = calculate_psnr(original, identical)
-
-    print("  Mükemmel Eşleşme Testi")
-    print(f"  MSE  : {mse_zero}")
-    print(f"  PSNR : {psnr_inf}")
-    print("=" * 45)
