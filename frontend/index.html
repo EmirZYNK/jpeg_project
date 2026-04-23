@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JPEG vs JPEG2000 Image Compression Analysis System</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1>JPEG vs JPEG2000 Image Compression Analysis System</h1>
+    </header>
+
+    <div class="main-layout">
+      <!-- LEFT PANEL -->
+      <aside class="sidebar">
+        <div class="panel">
+          <h2 class="panel-title">Upload Image</h2>
+
+          <label for="imageInput" class="upload-box">
+            <div class="upload-icon">⬆</div>
+            <p>Click to browse</p>
+            <span>PNG, BMP, TIFF</span>
+          </label>
+          <input type="file" id="imageInput" accept="image/png,image/bmp,image/tiff,image/jpeg" hidden />
+
+          <p id="selectedFile" class="selected-file">No file selected</p>
+
+          <!-- FR1: image info (color mode + resolution) shown after upload -->
+          <div id="imageInfo" class="image-info" style="display:none;">
+            <span id="imageInfoText"></span>
+          </div>
+
+          <div class="section">
+            <h3>Mode Selection</h3>
+            <label class="radio-line">
+              <input type="radio" name="mode" value="analysis" checked />
+              <span>Analysis Mode</span>
+            </label>
+            <label class="radio-line">
+              <input type="radio" name="mode" value="comparison" />
+              <span>Comparison Mode</span>
+            </label>
+          </div>
+
+          <div class="section" id="methodSection">
+            <h3>Compression Method</h3>
+            <label class="radio-line">
+              <input type="radio" name="method" value="jpeg" checked />
+              <span>JPEG (DCT-based)</span>
+            </label>
+            <label class="radio-line">
+              <input type="radio" name="method" value="jpeg2000" />
+              <span>JPEG2000 (DWT-based)</span>
+            </label>
+          </div>
+
+          <div class="section">
+            <h3>Image Type</h3>
+            <select id="imageType">
+              <option value="natural">Natural</option>
+              <option value="synthetic">Synthetic</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="biomedical">Biomedical</option>
+            </select>
+
+            <!-- FR22: biomedical warning -->
+            <div id="biomedicalWarning" class="biomedical-warning" style="display:none;">
+              ⚕️ Biomedical images use <strong>Lossless</strong> compression automatically.
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Parameters</h3>
+
+            <div class="field">
+              <label for="qualityRange">Quality: <span id="qualityValue">75</span></label>
+              <input type="range" id="qualityRange" min="1" max="100" value="75" />
+            </div>
+
+            <div class="field">
+              <label for="dwtLevelRange">DWT Level: <span id="dwtValue">3</span></label>
+              <input type="range" id="dwtLevelRange" min="1" max="5" value="3" />
+            </div>
+
+            <div class="field">
+              <label>Wavelet Filter</label>
+              <div class="wavelet-buttons">
+                <button type="button" class="wavelet-btn active" data-wavelet="haar">Haar</button>
+                <button type="button" class="wavelet-btn" data-wavelet="db4">Daubechies-4</button>
+                <button type="button" class="wavelet-btn" data-wavelet="db8">Daubechies-8</button>
+              </div>
+            </div>
+
+            <div class="field inline-field">
+              <label>Compression</label>
+              <div class="inline-options">
+                <label><input type="radio" name="compressionType" id="compressionLossy" value="lossy" checked /> Lossy</label>
+                <label><input type="radio" name="compressionType" id="compressionLossless" value="lossless" /> Lossless</label>
+              </div>
+            </div>
+
+            <div class="field checkbox-field">
+              <label>
+                <input type="checkbox" id="entropyCoding" />
+                Enable Entropy Coding (Huffman)
+              </label>
+            </div>
+          </div>
+
+          <button id="actionButton" class="primary-btn">Compress Image</button>
+        </div>
+      </aside>
+
+      <!-- RIGHT PANEL -->
+      <main class="content">
+        <!-- ANALYSIS MODE -->
+        <section id="analysisView" class="view active">
+          <div class="status-box status-blue">
+            <strong id="analysisTitle">Analysis Mode Active (Single Method: JPEG)</strong>
+          </div>
+
+          <div class="card">
+            <div class="two-column">
+              <div>
+                <h3>Original Image</h3>
+                <!-- FR1: resolution + color info shown below image -->
+                <div class="image-placeholder">
+                  <img id="originalPreview" alt="Original Preview" />
+                  <span id="originalText">No image uploaded</span>
+                </div>
+                <p id="originalImageMeta" class="image-meta"></p>
+              </div>
+
+              <div>
+                <h3 id="reconstructedTitle">Reconstructed Image (JPEG)</h3>
+                <div class="image-placeholder">
+                  <span>Awaiting compression</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Performance Metrics</h3>
+            <div class="metrics-grid">
+              <div class="metric-box"><span>PSNR</span><strong>—</strong></div>
+              <div class="metric-box"><span>MSE</span><strong>—</strong></div>
+              <div class="metric-box"><span>Compression Ratio</span><strong>—</strong></div>
+              <div class="metric-box"><span>Original Size</span><strong>—</strong></div>
+              <div class="metric-box"><span>Compressed Size</span><strong>—</strong></div>
+              <div class="metric-box"><span>Encoding Time</span><strong>—</strong></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Visualization</h3>
+            <div class="graph-placeholder">
+              Graph placeholder: PSNR vs Compression Ratio • BER vs PSNR
+            </div>
+            <p class="note" id="analysisNote">
+              Note: Only the selected compression method (JPEG) is applied.
+            </p>
+          </div>
+        </section>
+
+        <!-- COMPARISON MODE -->
+        <section id="comparisonView" class="view">
+          <div class="status-box status-green">
+            <strong>Comparison Mode Active (Dual Evaluation)</strong>
+            <p>Both JPEG and JPEG2000 are automatically applied using identical parameters for fair comparison.</p>
+          </div>
+
+          <div class="card">
+            <div class="three-column">
+              <div>
+                <h3>Original Image</h3>
+                <div class="image-placeholder">
+                  <img id="originalPreviewComparison" alt="Original Preview Comparison" />
+                  <span id="originalTextComparison">No image uploaded</span>
+                </div>
+                <p id="comparisonImageMeta" class="image-meta"></p>
+              </div>
+
+              <div>
+                <h3>JPEG Result (Auto-generated)</h3>
+                <div class="image-placeholder">
+                  <span>Awaiting comparison</span>
+                </div>
+              </div>
+
+              <div>
+                <h3>JPEG2000 Result (Auto-generated)</h3>
+                <div class="image-placeholder">
+                  <span>Awaiting comparison</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Metric Comparison Table</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  <th>JPEG (DCT)</th>
+                  <th>JPEG2000 (DWT)</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>PSNR (dB)</td><td>—</td><td>—</td><td></td></tr>
+                <tr><td>MSE</td><td>—</td><td>—</td><td></td></tr>
+                <tr><td>Compression Ratio</td><td>—</td><td>—</td><td></td></tr>
+                <tr><td>File Size</td><td>—</td><td>—</td><td></td></tr>
+                <tr><td>Encoding Time</td><td>—</td><td>—</td><td></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card">
+            <h3>Performance Comparison Chart</h3>
+            <div class="graph-placeholder">
+              Run comparison to see chart data
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
