@@ -1,11 +1,9 @@
-import sys
-import os
 from flask import Flask
+from flask_cors import CORS
 from routes.upload import upload_bp
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 app = Flask(__name__)
+CORS(app)
 
 app.register_blueprint(upload_bp)
 

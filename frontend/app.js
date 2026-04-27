@@ -1,4 +1,3 @@
-
 const modeInputs       = document.querySelectorAll('input[name="mode"]');
 const methodInputs     = document.querySelectorAll('input[name="method"]');
 const methodSection    = document.getElementById("methodSection");
@@ -34,32 +33,37 @@ const compressionLossy   = document.getElementById("compressionLossy");
 const compressionLossless = document.getElementById("compressionLossless");
 const waveletButtons     = document.querySelectorAll(".wavelet-btn");
 
+const BACKEND_URL = "http://127.0.0.1:5000";
 
-function getSelectedMode()   { return document.querySelector('input[name="mode"]:checked').value; }
-function getSelectedMethod() { return document.querySelector('input[name="method"]:checked').value; }
+
+function getSelectedMode() {
+  return document.querySelector('input[name="mode"]:checked').value;
+}
+
+function getSelectedMethod() {
+  return document.querySelector('input[name="method"]:checked').value;
+}
 
 function detectColorMode(img) {
   const canvas = document.createElement("canvas");
-  canvas.width  = Math.min(img.naturalWidth,  64);
+  canvas.width  = Math.min(img.naturalWidth, 64);
   canvas.height = Math.min(img.naturalHeight, 64);
+
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
   let isGray = true;
+
   for (let i = 0; i < data.length; i += 4) {
-    if (data[i] !== data[i + 1] || data[i] !== data[i + 2]) { isGray = false; break; }
+    if (data[i] !== data[i + 1] || data[i] !== data[i + 2]) {
+      isGray = false;
+      break;
+    }
   }
+
   return isGray ? "Grayscale" : "RGB";
 }
-
-
-function showImageMeta(img, metaEl) {
-  const w = img.naturalWidth;
-  const h = img.naturalHeight;
-  const mode = detectColorMode(img);
-  if (metaEl) metaEl.textContent = `${w} × ${h} px  ·  ${mode}`;
-}
-
 
 function updateModeUI() {
   const mode = getSelectedMode();
@@ -81,24 +85,20 @@ function updateModeUI() {
 function updateMethodUI() {
   const method = getSelectedMethod();
   const label  = method === "jpeg" ? "JPEG" : "JPEG2000";
+
   analysisTitle.textContent      = `Analysis Mode Active (Single Method: ${label})`;
   reconstructedTitle.textContent = `Reconstructed Image (${label})`;
   analysisNote.textContent       = `Note: Only the selected compression method (${label}) is applied.`;
 }
 
-
 function handleImageTypeChange() {
   const isBiomedical = imageTypeSelect.value === "biomedical";
 
   if (isBiomedical) {
-    
     compressionLossless.checked = true;
-    compressionLossy.checked    = false;
-    compressionLossy.disabled   = true;
-
-    
+    compressionLossy.checked = false;
+    compressionLossy.disabled = true;
     compressionLossy.closest("label").classList.add("locked");
-
     biomedicalWarning.style.display = "block";
   } else {
     compressionLossy.disabled = false;
@@ -107,26 +107,36 @@ function handleImageTypeChange() {
   }
 }
 
-
 function updateSliders() {
   qualityValue.textContent = qualityRange.value;
-  dwtValue.textContent     = dwtLevelRange.value;
+  dwtValue.textContent = dwtLevelRange.value;
+}
+
+function updateMetricBoxes(data, file) {
+  const metricValues = document.querySelectorAll("#analysisView .metric-box strong");
+
+  metricValues[0].textContent = data.psnr ?? "Not calculated";
+  metricValues[1].textContent = data.mse ?? "Not calculated";
+  metricValues[2].textContent = data.compression_ratio ?? "Not calculated";
+  metricValues[3].textContent = file ? `${file.size} bytes` : "—";
+  metricValues[4].textContent = data.compressed_size ?? "Not calculated";
+  metricValues[5].textContent = data.encoding_time ?? "Not calculated";
 }
 
 
 imageInput.addEventListener("change", () => {
   const file = imageInput.files[0];
 
-  
   originalPreview.src = "";
   originalPreview.style.display = "none";
-  originalText.style.display    = "block";
+  originalText.style.display = "block";
   if (originalImageMeta) originalImageMeta.textContent = "";
 
   if (originalPreviewComparison) {
     originalPreviewComparison.src = "";
     originalPreviewComparison.style.display = "none";
   }
+
   if (originalTextComparison) originalTextComparison.style.display = "block";
   if (comparisonImageMeta) comparisonImageMeta.textContent = "";
 
@@ -141,44 +151,42 @@ imageInput.addEventListener("change", () => {
   selectedFile.textContent = `Selected: ${file.name}`;
 
   const reader = new FileReader();
+
   reader.onload = function (e) {
     const src = e.target.result;
 
-    
     originalPreview.src = src;
     originalPreview.style.display = "block";
-    originalText.style.display    = "none";
+    originalText.style.display = "none";
 
-    
     if (originalPreviewComparison) {
       originalPreviewComparison.src = src;
       originalPreviewComparison.style.display = "block";
     }
-    if (originalTextComparison) originalTextComparison.style.display = "none";
 
-    
+    if (originalTextComparison) {
+      originalTextComparison.style.display = "none";
+    }
+
     originalPreview.onload = function () {
-      const w    = originalPreview.naturalWidth;
-      const h    = originalPreview.naturalHeight;
+      const w = originalPreview.naturalWidth;
+      const h = originalPreview.naturalHeight;
       const mode = detectColorMode(originalPreview);
       const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
-      
       imageInfoText.textContent = `${w}×${h}  ·  ${mode}  ·  ${fileSizeMB} MB`;
-      imageInfo.style.display   = "block";
+      imageInfo.style.display = "block";
 
-      
-      if (originalImageMeta) originalImageMeta.textContent = `${w} × ${h} px  ·  ${mode}  ·  ${fileSizeMB} MB`;
+      if (originalImageMeta) {
+        originalImageMeta.textContent = `${w} × ${h} px  ·  ${mode}  ·  ${fileSizeMB} MB`;
+      }
 
-      
-      if (originalPreviewComparison) {
-        originalPreviewComparison.onload = function () {
-          if (comparisonImageMeta)
-            comparisonImageMeta.textContent = `${w} × ${h} px  ·  ${mode}  ·  ${fileSizeMB} MB`;
-        };
+      if (comparisonImageMeta) {
+        comparisonImageMeta.textContent = `${w} × ${h} px  ·  ${mode}  ·  ${fileSizeMB} MB`;
       }
     };
   };
+
   reader.readAsDataURL(file);
 });
 
@@ -197,22 +205,72 @@ waveletButtons.forEach(button => {
 });
 
 
-actionButton.addEventListener("click", () => {
-  const mode            = getSelectedMode();
-  const method          = mode === "analysis" ? getSelectedMethod() : "both";
-  const imageType       = imageTypeSelect.value;
-  const quality         = qualityRange.value;
-  const dwtLevel        = dwtLevelRange.value;
-  const wavelet         = document.querySelector(".wavelet-btn.active").dataset.wavelet;
-  const compressionType = document.querySelector('input[name="compressionType"]:checked').value;
-  const entropyCoding   = document.getElementById("entropyCoding").checked;
-  const file            = imageInput.files[0];
+actionButton.addEventListener("click", async () => {
+  const file = imageInput.files[0];
 
-  const params = { file: file ? file.name : null, mode, method, imageType, quality, dwtLevel, wavelet, compressionType, entropyCoding };
-  console.log("Compression params:", params);
+  if (!file) {
+    alert("Lütfen önce bir resim seç!");
+    return;
+  }
 
-  
-  alert("Arayüz iskeleti çalışıyor. Backend bağlanınca gerçek işlem burada yapılacak.");
+  const mode = getSelectedMode();
+  const method = mode === "analysis" ? getSelectedMethod() : "jpeg";
+  const quality = parseInt(qualityRange.value);
+  const level = parseInt(dwtLevelRange.value);
+  const wavelet = document.querySelector(".wavelet-btn.active").dataset.wavelet;
+
+  try {
+    actionButton.disabled = true;
+    actionButton.textContent = "Processing...";
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    const uploadResponse = await fetch(`${BACKEND_URL}/upload`, {
+      method: "POST",
+      body: formData
+    });
+
+    const uploadData = await uploadResponse.json();
+    console.log("Upload response:", uploadData);
+
+    if (!uploadData.success) {
+      alert("Upload failed: " + uploadData.message);
+      return;
+    }
+
+    const compressResponse = await fetch(`${BACKEND_URL}/compress`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        filename: uploadData.filename,
+        method: method,
+        quality: quality,
+        wavelet: wavelet,
+        level: level
+      })
+    });
+
+    const compressData = await compressResponse.json();
+    console.log("Compress response:", compressData);
+
+    if (!compressData.success) {
+      alert("Compression failed: " + compressData.message);
+      return;
+    }
+
+    updateMetricBoxes(compressData, file);
+    alert(compressData.message);
+
+  } catch (error) {
+    console.error("Backend connection error:", error);
+    alert("Backend'e bağlanamadı. Flask server açık mı kontrol et.");
+  } finally {
+    actionButton.disabled = false;
+    updateModeUI();
+  }
 });
 
 
