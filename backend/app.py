@@ -1,9 +1,12 @@
+import sys
+import os
 from flask import Flask
 from routes.upload import upload_bp
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 app = Flask(__name__)
 
-# Blueprint register
 app.register_blueprint(upload_bp)
 
 
