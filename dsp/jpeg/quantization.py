@@ -13,18 +13,13 @@ JPEG_LUM_TABLE = np.array([
 ])
 
 def quantize_block(dct_block, quality=50):
-    """
-    DCT bloğunu belirlenen kalite seviyesine göre quantize eder.
-    Quality 1-100 arasıdır. 100 en yüksek kalite (en az sıkıştırma).
-    """
     if quality < 50:
         scale = 5000 / quality
     else:
         scale = 200 - quality * 2
     
-    # Tabloyu kaliteye göre ölçeklendir
     q_table = np.floor((JPEG_LUM_TABLE * scale + 50) / 100)
-    q_table[q_table < 1] = 1 # 0'a bölünmeyi engelle
+    q_table[q_table < 1] = 1 
     
     return np.round(dct_block / q_table)
 
@@ -38,4 +33,30 @@ def process_quantization(dct_coeffs, quality=50):
             if block.shape == (8, 8):
                 quantized_coeffs[i:i+8, j:j+8] = quantize_block(block, quality)
                 
-    return quantized_coeffs
+    return quantized_coeffs 
+
+# --- YENİ EKLENEN KISIM (TERS KUANTİZASYON - DECODER İÇİN) ---
+
+def dequantize_block(quantized_block, quality=50):
+    if quality < 50:
+        scale = 5000 / quality
+    else:
+        scale = 200 - quality * 2
+        
+    q_table = np.floor((JPEG_LUM_TABLE * scale + 50) / 100)
+    q_table[q_table < 1] = 1 
+    
+    # Geri Dönüşüm: Bölmek yerine ÇARPIYORUZ
+    return quantized_block * q_table
+
+def process_dequantization(quantized_coeffs, quality=50):
+    h, w = quantized_coeffs.shape
+    dequantized_coeffs = np.zeros((h, w))
+    
+    for i in range(0, h, 8):
+        for j in range(0, w, 8):
+            block = quantized_coeffs[i:i+8, j:j+8]
+            if block.shape == (8, 8):
+                dequantized_coeffs[i:i+8, j:j+8] = dequantize_block(block, quality)
+                
+    return dequantized_coeffs

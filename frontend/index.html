@@ -21,7 +21,7 @@
           <label for="imageInput" class="upload-box">
             <div class="upload-icon">⬆</div>
             <p>Click to browse</p>
-            <span>PNG, BMP, TIFF</span>
+            <span>PNG, BMP, TIFF, JPG</span>
           </label>
           <input type="file" id="imageInput" accept="image/png,image/bmp,image/tiff,image/jpeg" hidden />
 
@@ -127,8 +127,8 @@
                 <h3>Original Image</h3>
                 <!-- FR1: resolution + color info shown below image -->
                 <div class="image-placeholder">
-                  <img id="originalPreview" alt="Original Preview" />
                   <span id="originalText">No image uploaded</span>
+                  <img id="originalPreview" alt="Original Preview" style="display:none; max-width:100%;" />
                 </div>
                 <p id="originalImageMeta" class="image-meta"></p>
               </div>
@@ -136,7 +136,8 @@
               <div>
                 <h3 id="reconstructedTitle">Reconstructed Image (JPEG)</h3>
                 <div class="image-placeholder">
-                  <span>Awaiting compression</span>
+                  <span id="reconText">Awaiting compression</span>
+                  <img id="reconPreview" alt="Reconstructed Preview" style="display:none; max-width:100%;" />
                 </div>
               </div>
             </div>
@@ -145,12 +146,12 @@
           <div class="card">
             <h3>Performance Metrics</h3>
             <div class="metrics-grid">
-              <div class="metric-box"><span>PSNR</span><strong>—</strong></div>
-              <div class="metric-box"><span>MSE</span><strong>—</strong></div>
-              <div class="metric-box"><span>Compression Ratio</span><strong>—</strong></div>
-              <div class="metric-box"><span>Original Size</span><strong>—</strong></div>
-              <div class="metric-box"><span>Compressed Size</span><strong>—</strong></div>
-              <div class="metric-box"><span>Encoding Time</span><strong>—</strong></div>
+              <div class="metric-box"><span>PSNR</span><strong id="m-psnr">—</strong></div>
+              <div class="metric-box"><span>MSE</span><strong id="m-mse">—</strong></div>
+              <div class="metric-box"><span>Compression Ratio</span><strong id="m-ratio">—</strong></div>
+              <div class="metric-box"><span>Original Size</span><strong id="m-orig-size">—</strong></div>
+              <div class="metric-box"><span>Compressed Size</span><strong id="m-comp-size">—</strong></div>
+              <div class="metric-box"><span>Encoding Time</span><strong id="m-time">—</strong></div>
             </div>
           </div>
 
@@ -177,8 +178,8 @@
               <div>
                 <h3>Original Image</h3>
                 <div class="image-placeholder">
-                  <img id="originalPreviewComparison" alt="Original Preview Comparison" />
                   <span id="originalTextComparison">No image uploaded</span>
+                  <img id="originalPreviewComparison" alt="Original Preview Comparison" style="display:none; max-width:100%;" />
                 </div>
                 <p id="comparisonImageMeta" class="image-meta"></p>
               </div>
@@ -186,14 +187,16 @@
               <div>
                 <h3>JPEG Result (Auto-generated)</h3>
                 <div class="image-placeholder">
-                  <span>Awaiting comparison</span>
+                  <span id="compJpegText">Awaiting comparison</span>
+                  <img id="compJpegPreview" alt="JPEG Result" style="display:none; max-width:100%;" />
                 </div>
               </div>
 
               <div>
                 <h3>JPEG2000 Result (Auto-generated)</h3>
                 <div class="image-placeholder">
-                  <span>Awaiting comparison</span>
+                  <span id="compJpeg2000Text">Awaiting comparison</span>
+                  <img id="compJpeg2000Preview" alt="JPEG2000 Result" style="display:none; max-width:100%;" />
                 </div>
               </div>
             </div>
@@ -211,11 +214,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr><td>PSNR (dB)</td><td>—</td><td>—</td><td></td></tr>
-                <tr><td>MSE</td><td>—</td><td>—</td><td></td></tr>
-                <tr><td>Compression Ratio</td><td>—</td><td>—</td><td></td></tr>
-                <tr><td>File Size</td><td>—</td><td>—</td><td></td></tr>
-                <tr><td>Encoding Time</td><td>—</td><td>—</td><td></td></tr>
+                <tr><td>PSNR (dB)</td><td id="comp-psnr-jpeg">—</td><td id="comp-psnr-j2k">—</td><td id="comp-psnr-res"></td></tr>
+                <tr><td>MSE</td><td id="comp-mse-jpeg">—</td><td id="comp-mse-j2k">—</td><td id="comp-mse-res"></td></tr>
+                <tr><td>Compression Ratio</td><td id="comp-ratio-jpeg">—</td><td id="comp-ratio-j2k">—</td><td id="comp-ratio-res"></td></tr>
+                <tr><td>File Size</td><td id="comp-size-jpeg">—</td><td id="comp-size-j2k">—</td><td id="comp-size-res"></td></tr>
+                <tr><td>Encoding Time</td><td id="comp-time-jpeg">—</td><td id="comp-time-j2k">—</td><td id="comp-time-res"></td></tr>
               </tbody>
             </table>
           </div>
