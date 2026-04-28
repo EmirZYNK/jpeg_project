@@ -1,4 +1,5 @@
 import os
+import time
 from flask import Blueprint, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from PIL import Image
@@ -98,9 +99,15 @@ def compress_image():
     # Metrik hesaplamaları için orijinal resmi 0-1 aralığında normalize et
     normalized_img = gray_image / 255.0
 
+    # Orijinal dosya boyutu (byte)
+    original_file_size = os.path.getsize(image_path)
+
     # Oluşacak yeni resmin adı ve yolu
     recon_filename = f"reconstructed_{method}_{filename}"
     recon_path = os.path.join(UPLOAD_FOLDER, recon_filename)
+
+    # === ZAMANLAMA BAŞLAT ===
+    start_time = time.time()
 
     if method == "jpeg":
         # === ENCODER (SIKIŞTIRMA) ===
@@ -121,11 +128,24 @@ def compress_image():
         dequantized_dwt_data = dequantize_dwt(quantized_dwt_data, quality=quality)
         reconstructed_gray = apply_idwt_2d(dequantized_dwt_data, wavelet_name=wavelet)
 
+    # === ZAMANLAMA BİTİR ===
+    elapsed_time = round(time.time() - start_time, 4)
+
     # Değerleri 0-255 aralığına sıkıştır ve tam sayıya çevir
     reconstructed_gray = np.clip(reconstructed_gray, 0, 255).astype(np.uint8)
     
     # Yeni resmi "uploads" klasörüne kaydet
     Image.fromarray(reconstructed_gray).save(recon_path)
+
+    # === BOYUT VE ORAN HESAPLAMA ===
+    compressed_file_size = os.path.getsize(recon_path)
+    compressed_size_kb = round(compressed_file_size / 1024, 2)
+    original_size_kb = round(original_file_size / 1024, 2)
+
+    if compressed_file_size > 0:
+        compression_ratio = round(original_file_size / compressed_file_size, 2)
+    else:
+        compression_ratio = 0
 
     # === METRİK HESAPLAMA ===
     # Metrik hesabı için oluşturulan resmi de 0-1 aralığına çekiyoruz
@@ -140,7 +160,10 @@ def compress_image():
     return jsonify({
         "success": True,
         "message": f"{method.upper()} compression and reconstruction completed.",
-        "recon_filename": recon_filename, # Frontend'in resmi çekeceği dosya adı
+        "recon_filename": recon_filename,
         "psnr": psnr_display,
-        "mse": round(mse_val, 5)
+        "mse": round(mse_val, 5),
+        "compression_ratio": f"{compression_ratio}:1",
+        "compressed_size": compressed_size_kb,
+        "encoding_time": elapsed_time
     }), 200
