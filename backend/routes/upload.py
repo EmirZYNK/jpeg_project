@@ -36,7 +36,63 @@ def allowed_file(filename):
         and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
     )
 
-# --- YENİ EKLENDİ: Frontend'e Resim Gönderme Rotası ---
+
+# ============================================================
+# YARDIMCI FONKSİYON: Tek bir kanalı sıkıştırma pipeline'ından geçirir
+# FR1 için: RGB resimlerde her kanal (R, G, B) bağımsız olarak bu fonksiyondan geçer
+# ============================================================
+def process_single_channel(channel_data, method, quality, wavelet, level, use_entropy):
+    """
+    Tek bir renk kanalını (veya gri tonlamalı resmi) sıkıştırma pipeline'ından geçirir.
+
+    Returns:
+        reconstructed: Yeniden oluşturulmuş kanal verisi (numpy array)
+        huffman_bits: Huffman kodlama toplam bit sayısı (None ise entropy kapalı)
+    """
+    huffman_bits = None
+
+    if method == "jpeg":
+        # === ENCODER (SIKIŞTIRMA) ===
+        dct_data = process_image_dct(channel_data)
+        quantized_data = process_quantization(dct_data, quality=quality)
+
+        # FR13/FR14: Entropy Coding (Opsiyonel)
+        if use_entropy:
+            huff_table = encode_huffman(quantized_data)
+            flat_data = quantized_data.flatten().astype(int)
+            huffman_bits = sum(len(huff_table.get(val, '0' * 8)) for val in flat_data)
+
+        # === DECODER (GERİ AÇMA) ===
+        dequantized_data = process_dequantization(quantized_data, quality=quality)
+        reconstructed = process_image_idct(dequantized_data)
+
+    elif method == "jpeg2000":
+        # === ENCODER (SIKIŞTIRMA) ===
+        dwt_coeffs = apply_dwt_2d(channel_data, wavelet_name=wavelet, level=level)
+        quantized_dwt_data = quantize_dwt(dwt_coeffs, quality=quality)
+
+        # FR13/FR14: Entropy Coding (Opsiyonel)
+        if use_entropy:
+            all_coeffs = []
+            for c in quantized_dwt_data:
+                if isinstance(c, np.ndarray):
+                    all_coeffs.append(c.flatten())
+                else:
+                    for sub in c:
+                        all_coeffs.append(sub.flatten())
+            combined = np.concatenate(all_coeffs)
+            huff_table = encode_huffman(combined)
+            flat_data = combined.flatten().astype(int)
+            huffman_bits = sum(len(huff_table.get(val, '0' * 8)) for val in flat_data)
+
+        # === DECODER (GERİ AÇMA) ===
+        dequantized_dwt_data = dequantize_dwt(quantized_dwt_data, quality=quality)
+        reconstructed = apply_idwt_2d(dequantized_dwt_data, wavelet_name=wavelet)
+
+    return reconstructed, huffman_bits
+
+
+# --- Frontend'e Resim Gönderme Rotası ---
 @upload_bp.route("/uploads/<filename>")
 def get_image(filename):
     """Sıkıştırılıp yeniden oluşturulmuş resmi arayüze gönderir."""
@@ -80,6 +136,8 @@ def compress_image():
     quality = int(data.get("quality", 75))
     wavelet = data.get("wavelet", "haar")
     level = int(data.get("level", 1))
+    is_lossless = data.get("is_lossless", False)
+    use_entropy = data.get("use_entropy", False)
 
     if not filename:
         return jsonify({"success": False, "message": "filename is required."}), 400
@@ -92,55 +150,64 @@ def compress_image():
     if not os.path.exists(image_path):
         return jsonify({"success": False, "message": "Uploaded image not found."}), 404
 
-    # Resmi Oku ve Numpy Array'e Çevir
-    image = Image.open(image_path).convert("L")
-    gray_image = np.array(image).astype(np.float32)
-    
-    # Metrik hesaplamaları için orijinal resmi 0-1 aralığında normalize et
-    normalized_img = gray_image / 255.0
+    # FR22: Kayıpsız mod seçildiyse quality'yi 100'e zorla
+    if is_lossless:
+        quality = 100
+
+    # FR1: Resim renkli mi yoksa siyah-beyaz mı otomatik algıla
+    image = Image.open(image_path)
+    is_color = image.mode in ("RGB", "RGBA", "CMYK")
+
+    if is_color:
+        image_rgb = image.convert("RGB")
+        img_array = np.array(image_rgb).astype(np.float32)
+        channels = [img_array[:, :, i] for i in range(3)]  # R, G, B
+        color_mode = "RGB"
+    else:
+        image_gray = image.convert("L")
+        channels = [np.array(image_gray).astype(np.float32)]
+        color_mode = "Grayscale"
 
     # Orijinal dosya boyutu (byte)
     original_file_size = os.path.getsize(image_path)
 
-    # Oluşacak yeni resmin adı ve yolu
-    recon_filename = f"reconstructed_{method}_{filename}"
+    # Oluşacak yeni resmin adı ve yolu (PNG formatında kaydediyoruz)
+    recon_basename = os.path.splitext(filename)[0]
+    recon_filename = f"reconstructed_{method}_{recon_basename}.png"
     recon_path = os.path.join(UPLOAD_FOLDER, recon_filename)
 
     # === ZAMANLAMA BAŞLAT ===
     start_time = time.time()
 
-    if method == "jpeg":
-        # === ENCODER (SIKIŞTIRMA) ===
-        dct_data = process_image_dct(gray_image)
-        quantized_data = process_quantization(dct_data, quality=quality)
-        huffman_table = encode_huffman(quantized_data)
-        
-        # === DECODER (GERİ AÇMA) ===
-        dequantized_data = process_dequantization(quantized_data, quality=quality)
-        reconstructed_gray = process_image_idct(dequantized_data)
+    # Her kanalı bağımsız olarak sıkıştırma pipeline'ından geçir
+    reconstructed_channels = []
+    total_huffman_bits = 0
 
-    elif method == "jpeg2000":
-        # === ENCODER (SIKIŞTIRMA) ===
-        dwt_coeffs = apply_dwt_2d(gray_image, wavelet_name=wavelet, level=level)
-        quantized_dwt_data = quantize_dwt(dwt_coeffs, quality=quality)
-
-        # === DECODER (GERİ AÇMA) ===
-        dequantized_dwt_data = dequantize_dwt(quantized_dwt_data, quality=quality)
-        reconstructed_gray = apply_idwt_2d(dequantized_dwt_data, wavelet_name=wavelet)
+    for channel in channels:
+        recon_ch, huff_bits = process_single_channel(
+            channel, method, quality, wavelet, level, use_entropy
+        )
+        # DWT boyut uyumsuzluğu olursa orijinal boyuta kırp
+        h, w = channel.shape
+        recon_ch = recon_ch[:h, :w]
+        reconstructed_channels.append(np.clip(recon_ch, 0, 255).astype(np.uint8))
+        if huff_bits is not None:
+            total_huffman_bits += huff_bits
 
     # === ZAMANLAMA BİTİR ===
     elapsed_time = round(time.time() - start_time, 4)
 
-    # Değerleri 0-255 aralığına sıkıştır ve tam sayıya çevir
-    reconstructed_gray = np.clip(reconstructed_gray, 0, 255).astype(np.uint8)
-    
-    # Yeni resmi "uploads" klasörüne kaydet
-    Image.fromarray(reconstructed_gray).save(recon_path)
+    # Kanalları birleştir ve kaydet
+    if is_color:
+        reconstructed_img = np.stack(reconstructed_channels, axis=2)
+        Image.fromarray(reconstructed_img, 'RGB').save(recon_path)
+    else:
+        reconstructed_img = reconstructed_channels[0]
+        Image.fromarray(reconstructed_img).save(recon_path)
 
     # === BOYUT VE ORAN HESAPLAMA ===
     compressed_file_size = os.path.getsize(recon_path)
     compressed_size_kb = round(compressed_file_size / 1024, 2)
-    original_size_kb = round(original_file_size / 1024, 2)
 
     if compressed_file_size > 0:
         compression_ratio = round(original_file_size / compressed_file_size, 2)
@@ -148,16 +215,21 @@ def compress_image():
         compression_ratio = 0
 
     # === METRİK HESAPLAMA ===
-    # Metrik hesabı için oluşturulan resmi de 0-1 aralığına çekiyoruz
-    norm_reconstructed = reconstructed_gray.astype(np.float32) / 255.0
-    
-    psnr_val = calculate_psnr(normalized_img, norm_reconstructed)
-    mse_val = calculate_mse(normalized_img, norm_reconstructed)
+    if is_color:
+        original_norm = img_array / 255.0
+        recon_norm = reconstructed_img.astype(np.float32) / 255.0
+    else:
+        original_norm = channels[0] / 255.0
+        recon_norm = reconstructed_img.astype(np.float32) / 255.0
+
+    psnr_val = calculate_psnr(original_norm, recon_norm)
+    mse_val = calculate_mse(original_norm, recon_norm)
 
     # Eğer resim kayıpsızsa (birebir aynıysa) Infinity yazar, değilse yuvarlar.
     psnr_display = "Infinity" if psnr_val == float('inf') else round(psnr_val, 2)
 
-    return jsonify({
+    # Yanıt JSON'unu oluştur
+    response = {
         "success": True,
         "message": f"{method.upper()} compression and reconstruction completed.",
         "recon_filename": recon_filename,
@@ -165,5 +237,16 @@ def compress_image():
         "mse": round(mse_val, 5),
         "compression_ratio": f"{compression_ratio}:1",
         "compressed_size": compressed_size_kb,
-        "encoding_time": elapsed_time
-    }), 200
+        "encoding_time": elapsed_time,
+        "color_mode": color_mode
+    }
+
+    # FR13/FR14: Entropy coding istatistikleri
+    if use_entropy and total_huffman_bits > 0:
+        huffman_size_kb = round(total_huffman_bits / 8 / 1024, 2)
+        uncompressed_bits = sum(ch.size for ch in channels) * 8
+        entropy_ratio = round(uncompressed_bits / total_huffman_bits, 2)
+        response["huffman_compressed_size"] = huffman_size_kb
+        response["entropy_compression_ratio"] = f"{entropy_ratio}:1"
+
+    return jsonify(response), 200

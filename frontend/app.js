@@ -241,6 +241,8 @@ actionButton.addEventListener("click", async () => {
   const quality = parseInt(qualityRange.value);
   const level = parseInt(dwtLevelRange.value);
   const wavelet = document.querySelector(".wavelet-btn.active")?.dataset.wavelet || "haar";
+    const isLossless = document.querySelector('input[name="compressionType"]:checked').value === "lossless";
+    const useEntropy = document.getElementById("entropyCoding").checked;
 
   try {
     actionButton.disabled = true;
@@ -267,7 +269,7 @@ actionButton.addEventListener("click", async () => {
       const compressResponse = await fetch(`${BACKEND_URL}/compress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: uploadData.filename, method, quality, wavelet, level })
+        body: JSON.stringify({ filename: uploadData.filename, method, quality, wavelet, level, is_lossless: isLossless, use_entropy: useEntropy })
       });
 
       const compressData = await compressResponse.json();
@@ -291,7 +293,7 @@ actionButton.addEventListener("click", async () => {
       const resJpeg = await fetch(`${BACKEND_URL}/compress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: uploadData.filename, method: "jpeg", quality, wavelet, level })
+        body: JSON.stringify({ filename: uploadData.filename, method: "jpeg", quality, wavelet, level, is_lossless: isLossless, use_entropy: useEntropy })
       });
       const dataJpeg = await resJpeg.json();
 
@@ -299,7 +301,7 @@ actionButton.addEventListener("click", async () => {
       const resJ2k = await fetch(`${BACKEND_URL}/compress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: uploadData.filename, method: "jpeg2000", quality, wavelet, level })
+        body: JSON.stringify({ filename: uploadData.filename, method: "jpeg2000", quality, wavelet, level, is_lossless: isLossless, use_entropy: useEntropy })
       });
       const dataJ2k = await resJ2k.json();
 
