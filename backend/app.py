@@ -1,24 +1,32 @@
-import sys
+from flask import Flask, render_template, send_from_directory
+from flask_cors import CORS
+from routes.compression import compression_bp
 import os
 
-# Proje ana dizinini (backend'in bir üst klasörü) Python'un arama yoluna ekliyoruz.
-# Bu sayede Python, 'dsp' klasörünü dışarıda olmasına rağmen rahatça bulabilecek.
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
+CORS(app) # Frontend ile Backend'in sorunsuz haberleşmesi için
 
-from flask import Flask
-from flask_cors import CORS
-from routes.upload import upload_bp
+# Klasörlerin var olduğundan emin olalım
+os.makedirs('../data/uploads', exist_ok=True)
+os.makedirs('../data/outputs', exist_ok=True)
 
-app = Flask(__name__)
-CORS(app)
+# Blueprint'leri (rotaları) kaydet
+app.register_blueprint(compression_bp, url_prefix='/api')
 
-app.register_blueprint(upload_bp)
+# Ana sayfayı render et
+@app.route('/')
+def index():
+    return render_template('index.html')
 
+# Frontend statik dosyaları (css, js) için
+@app.route('/<path:path>')
+def serve_static(path):
+    return send_from_directory('../frontend', path)
 
-@app.route("/")
-def home():
-    return "Backend Server Running!"
+# İşlenmiş görselleri frontend'e sunmak için
+@app.route('/outputs/<path:filename>')
+def serve_outputs(filename):
+    return send_from_directory('../data/outputs', filename)
 
-
-if __name__ == "__main__":
-    app.run(debug=True)
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)

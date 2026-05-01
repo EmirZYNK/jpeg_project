@@ -1,239 +1,98 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>JPEG vs JPEG2000 Image Compression Analysis System</title>
-  <link rel="stylesheet" href="style.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JPEG vs JPEG2000 Projesi</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <header class="topbar">
-      <h1>JPEG vs JPEG2000 Image Compression Analysis System</h1>
-    </header>
-
-    <div class="main-layout">
-      <!-- LEFT PANEL -->
-      <aside class="sidebar">
-        <div class="panel">
-          <h2 class="panel-title">Upload Image</h2>
-
-          <label for="imageInput" class="upload-box">
-            <div class="upload-icon">⬆</div>
-            <p>Click to browse</p>
-            <span>PNG, BMP, TIFF, JPG</span>
-          </label>
-          <input type="file" id="imageInput" accept="image/png,image/bmp,image/tiff,image/jpeg" hidden />
-
-          <p id="selectedFile" class="selected-file">No file selected</p>
-
-          <!-- FR1: image info (color mode + resolution) shown after upload -->
-          <div id="imageInfo" class="image-info" style="display:none;">
-            <span id="imageInfoText"></span>
-          </div>
-
-          <div class="section">
-            <h3>Mode Selection</h3>
-            <label class="radio-line">
-              <input type="radio" name="mode" value="analysis" checked />
-              <span>Analysis Mode</span>
-            </label>
-            <label class="radio-line">
-              <input type="radio" name="mode" value="comparison" />
-              <span>Comparison Mode</span>
-            </label>
-          </div>
-
-          <div class="section" id="methodSection">
-            <h3>Compression Method</h3>
-            <label class="radio-line">
-              <input type="radio" name="method" value="jpeg" checked />
-              <span>JPEG (DCT-based)</span>
-            </label>
-            <label class="radio-line">
-              <input type="radio" name="method" value="jpeg2000" />
-              <span>JPEG2000 (DWT-based)</span>
-            </label>
-          </div>
-
-          <div class="section">
-            <h3>Image Type</h3>
-            <select id="imageType">
-              <option value="natural">Natural</option>
-              <option value="synthetic">Synthetic</option>
-              <option value="hybrid">Hybrid</option>
-              <option value="biomedical">Biomedical</option>
-            </select>
-
-            <!-- FR22: biomedical warning -->
-            <div id="biomedicalWarning" class="biomedical-warning" style="display:none;">
-              ⚕️ Biomedical images use <strong>Lossless</strong> compression automatically.
-            </div>
-          </div>
-
-          <div class="section">
-            <h3>Parameters</h3>
-
-            <div class="field">
-              <label for="qualityRange">Quality: <span id="qualityValue">75</span></label>
-              <input type="range" id="qualityRange" min="1" max="100" value="75" />
+    <div class="container">
+        <h1>Görüntü Sıkıştırma: JPEG vs JPEG2000</h1>
+        
+        <div class="controls">
+            <!-- Dosya Seçimi -->
+            <div class="control-group">
+                <label>Resim Seçin:</label>
+                <input type="file" id="imageInput" accept="image/png, image/jpeg">
             </div>
 
-            <div class="field">
-              <label for="dwtLevelRange">DWT Level: <span id="dwtValue">3</span></label>
-              <input type="range" id="dwtLevelRange" min="1" max="5" value="3" />
+            <!-- Görüntü Kategorisi -->
+            <div class="control-group">
+                <label>Görüntü Kategorisi:</label>
+                <select id="categorySelect">
+                    <option value="natural">Doğal (Manzara, Portre)</option>
+                    <option value="synthetic">Sentetik (Grafik, Logo)</option>
+                    <option value="biomedical">Biyomedikal (X-Ray, MR)</option>
+                </select>
             </div>
 
-            <div class="field">
-              <label>Wavelet Filter</label>
-              <div class="wavelet-buttons">
-                <button type="button" class="wavelet-btn active" data-wavelet="haar">Haar</button>
-                <button type="button" class="wavelet-btn" data-wavelet="db4">Daubechies-4</button>
-                <button type="button" class="wavelet-btn" data-wavelet="db8">Daubechies-8</button>
-              </div>
+            <!-- Algoritma Seçimi -->
+            <div class="control-group">
+                <label>Algoritma:</label>
+                <select id="algorithmSelect">
+                    <option value="jpeg">JPEG (DCT Tabanlı - Blok Sıkıştırma)</option>
+                    <option value="jpeg2000">JPEG 2000 (DWT Tabanlı - Dalgacık Sıkıştırma)</option>
+                </select>
             </div>
 
-            <div class="field inline-field">
-              <label>Compression</label>
-              <div class="inline-options">
-                <label><input type="radio" name="compressionType" id="compressionLossy" value="lossy" checked /> Lossy</label>
-                <label><input type="radio" name="compressionType" id="compressionLossless" value="lossless" /> Lossless</label>
-              </div>
+            <!-- JPEG 2000'e Özel Parametreler -->
+            <div id="jpeg2000Params" style="display: none; border-top: 1px solid #585b70; padding-top: 10px; margin-top: 10px;">
+                <div class="control-group">
+                    <label>Wavelet Filtresi:</label>
+                    <select id="waveletSelect">
+                        <option value="haar">Haar</option>
+                        <option value="db1">Daubechies (db1)</option>
+                        <option value="bior4.4">Biorthogonal (bior4.4)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Dekompozisyon Seviyesi:</label>
+                    <input type="number" id="levelInput" min="1" max="5" value="2">
+                </div>
             </div>
-
-            <div class="field checkbox-field">
-              <label>
-                <input type="checkbox" id="entropyCoding" />
-                Enable Entropy Coding (Huffman)
-              </label>
+            
+            <!-- Sıkıştırma Oranı Slider -->
+            <div class="slider-container">
+                <label for="ratioSlider">Sıkıştırma Oranı: <b>%<span id="ratioValue">50</span></b></label>
+                <input type="range" id="ratioSlider" min="1" max="99" value="50">
+                <div class="slider-labels">
+                    <span>Az Sıkıştır (Net)</span>
+                    <span>Çok Sıkıştır (Bozuk)</span>
+                </div>
             </div>
-          </div>
-
-          <button id="actionButton" class="primary-btn">Compress Image</button>
+            
+            <button id="compressBtn">Sıkıştırmayı Başlat</button>
         </div>
-      </aside>
 
-      <!-- RIGHT PANEL -->
-      <main class="content">
-        <!-- ANALYSIS MODE -->
-        <section id="analysisView" class="view active">
-          <div class="status-box status-blue">
-            <strong id="analysisTitle">Analysis Mode Active (Single Method: JPEG)</strong>
-          </div>
-
-          <div class="card">
-            <div class="two-column">
-              <div>
-                <h3>Original Image</h3>
-                <!-- FR1: resolution + color info shown below image -->
-                <div class="image-placeholder">
-                  <span id="originalText">No image uploaded</span>
-                  <img id="originalPreview" alt="Original Preview" style="display:none; max-width:100%;" />
+        <!-- Sonuç Alanı -->
+        <div class="results" id="resultsArea" style="display: none; flex-direction: column; align-items: center;">
+            <div style="display: flex; width: 100%; gap: 20px; justify-content: center;">
+                <div class="image-box">
+                    <h3>Orijinal Resim</h3>
+                    <img id="originalPreview" src="" alt="Orijinal">
+                    <p id="originalStats" class="stats-text"></p>
                 </div>
-                <p id="originalImageMeta" class="image-meta"></p>
-              </div>
-
-              <div>
-                <h3 id="reconstructedTitle">Reconstructed Image (JPEG)</h3>
-                <div class="image-placeholder">
-                  <span id="reconText">Awaiting compression</span>
-                  <img id="reconPreview" alt="Reconstructed Preview" style="display:none; max-width:100%;" />
+                <div class="image-box">
+                    <h3>İşlenmiş Resim (<span id="resultAlgo"></span>)</h3>
+                    <img id="compressedPreview" src="" alt="İşlenmiş">
+                    <p id="compressedStats" class="stats-text"></p>
+                    <!-- Metrik Alanları -->
+                    <div class="metrics-container">
+                        <div class="metric">MSE: <span id="mseVal">-</span></div>
+                        <div class="metric">PSNR: <span id="psnrVal">-</span> dB</div>
+                        <div class="metric">SSIM: <span id="ssimVal">-</span></div>
+                    </div>
                 </div>
-              </div>
             </div>
-          </div>
 
-          <div class="card">
-            <h3>Performance Metrics</h3>
-            <div class="metrics-grid">
-              <div class="metric-box"><span>PSNR</span><strong id="m-psnr">—</strong></div>
-              <div class="metric-box"><span>MSE</span><strong id="m-mse">—</strong></div>
-              <div class="metric-box"><span>Compression Ratio</span><strong id="m-ratio">—</strong></div>
-              <div class="metric-box"><span>Original Size</span><strong id="m-orig-size">—</strong></div>
-              <div class="metric-box"><span>Compressed Size</span><strong id="m-comp-size">—</strong></div>
-              <div class="metric-box"><span>Encoding Time</span><strong id="m-time">—</strong></div>
+            <!-- Performans Analiz Grafiği (Yeni) -->
+            <div class="plot-container" style="margin-top: 30px; text-align: center; width: 100%; border-top: 1px solid #585b70; padding-top: 20px;">
+                <h3 style="color: #edf2f4; margin-bottom: 15px;">Performans Analiz Grafiği (PSNR vs Sıkıştırma)</h3>
+                <img id="comparisonPlot" src="" style="max-width: 100%; border-radius: 10px; display: none; background-color: white; padding: 10px;">
             </div>
-          </div>
-
-          <div class="card">
-            <h3>Visualization</h3>
-            <div class="graph-placeholder">
-              Graph placeholder: PSNR vs Compression Ratio • BER vs PSNR
-            </div>
-            <p class="note" id="analysisNote">
-              Note: Only the selected compression method (JPEG) is applied.
-            </p>
-          </div>
-        </section>
-
-        <!-- COMPARISON MODE -->
-        <section id="comparisonView" class="view">
-          <div class="status-box status-green">
-            <strong>Comparison Mode Active (Dual Evaluation)</strong>
-            <p>Both JPEG and JPEG2000 are automatically applied using identical parameters for fair comparison.</p>
-          </div>
-
-          <div class="card">
-            <div class="three-column">
-              <div>
-                <h3>Original Image</h3>
-                <div class="image-placeholder">
-                  <span id="originalTextComparison">No image uploaded</span>
-                  <img id="originalPreviewComparison" alt="Original Preview Comparison" style="display:none; max-width:100%;" />
-                </div>
-                <p id="comparisonImageMeta" class="image-meta"></p>
-              </div>
-
-              <div>
-                <h3>JPEG Result (Auto-generated)</h3>
-                <div class="image-placeholder">
-                  <span id="compJpegText">Awaiting comparison</span>
-                  <img id="compJpegPreview" alt="JPEG Result" style="display:none; max-width:100%;" />
-                </div>
-              </div>
-
-              <div>
-                <h3>JPEG2000 Result (Auto-generated)</h3>
-                <div class="image-placeholder">
-                  <span id="compJpeg2000Text">Awaiting comparison</span>
-                  <img id="compJpeg2000Preview" alt="JPEG2000 Result" style="display:none; max-width:100%;" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>Metric Comparison Table</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>JPEG (DCT)</th>
-                  <th>JPEG2000 (DWT)</th>
-                  <th>Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>PSNR (dB)</td><td id="comp-psnr-jpeg">—</td><td id="comp-psnr-j2k">—</td><td id="comp-psnr-res"></td></tr>
-                <tr><td>MSE</td><td id="comp-mse-jpeg">—</td><td id="comp-mse-j2k">—</td><td id="comp-mse-res"></td></tr>
-                <tr><td>Compression Ratio</td><td id="comp-ratio-jpeg">—</td><td id="comp-ratio-j2k">—</td><td id="comp-ratio-res"></td></tr>
-                <tr><td>File Size</td><td id="comp-size-jpeg">—</td><td id="comp-size-j2k">—</td><td id="comp-size-res"></td></tr>
-                <tr><td>Encoding Time</td><td id="comp-time-jpeg">—</td><td id="comp-time-j2k">—</td><td id="comp-time-res"></td></tr>
-              </tbody>
-            </table>
-          </div>
-
-          <div class="card">
-            <h3>Performance Comparison Chart</h3>
-            <div class="graph-placeholder">
-              Run comparison to see chart data
-            </div>
-          </div>
-        </section>
-      </main>
+        </div>
     </div>
-  </div>
-
-  <script src="app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

@@ -1,31 +1,20 @@
-# dsp/jpeg2000/wavelet_filters.py
-
 import pywt
 
-def get_wavelet(wavelet_name: str) -> pywt.Wavelet:
-    """
-    Frontend'den gelen dalgacık ismini (string) alıp PyWavelets nesnesine çevirir.
-    
-    Desteklenen filtreler: 'haar', 'db4', 'db8'
-    """
-    # UI'dan gelen değerleri PyWavelets karşılıklarına eşleştiriyoruz
-    valid_wavelets = {
+def get_available_wavelets():
+    """Desteklenen filtreleri döndürür."""
+    return {
         'haar': 'haar',
-        'db4': 'db4',
-        'db8': 'db8'
+        'db1': 'db1',
+        'db2': 'db2',
+        'bior4.4': 'bior4.4',
+        'sym2': 'sym2'
     }
-    
-    if wavelet_name.lower() not in valid_wavelets:
-        # Desteklenmeyen bir filtre gelirse varsayılan olarak haar kullan
-        print(f"Uyarı: '{wavelet_name}' desteklenmiyor. 'haar' filtresine geçiliyor.")
-        return pywt.Wavelet('haar')
-        
-    return pywt.Wavelet(valid_wavelets[wavelet_name.lower()])
 
-def get_max_level(image_shape, wavelet_name: str) -> int:
-    """
-    Verilen resim boyutu ve filtreye göre uygulanabilecek maksimum DWT seviyesini döndürür.
-    Bu, kullanıcının UI'dan girdiği DWT Level'ı valide etmek için faydalıdır.
-    """
-    wavelet = get_wavelet(wavelet_name)
-    return pywt.dwt_max_level(data_len=min(image_shape), filter_len=wavelet.dec_len)
+def get_filter_info(wavelet_name):
+    """Filtre hakkında teknik bilgi verir (Hoca sorarsa diye)."""
+    w = pywt.Wavelet(wavelet_name)
+    return {
+        'name': w.name,
+        'family': w.family_name,
+        'length': w.dec_len # Filtre boyu
+    }

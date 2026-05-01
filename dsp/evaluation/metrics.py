@@ -1,67 +1,23 @@
-"""
-dsp/evaluation/metrics.py
-
-CENG 384 - Signal Processing
-Görüntü kalite metrikleri: MSE ve PSNR hesaplama modülü.
-Normalize edilmiş (0.0 – 1.0 aralığında) float32 tipinde
-512×512 NumPy array'leri üzerinde çalışır.
-"""
-
 import numpy as np
+from skimage.metrics import peak_signal_noise_ratio as psnr_metric
+from skimage.metrics import structural_similarity as ssim_metric
+from skimage.metrics import mean_squared_error as mse_metric
 
-
-def calculate_mse(original: np.ndarray, decoded: np.ndarray) -> float:
+def calculate_metrics(original_np, compressed_np):
     """
-    İki görüntü matrisi arasındaki Mean Squared Error (MSE) değerini hesaplar.
-
-    Formül:
-        MSE = (1 / N) * Σ (original_i - decoded_i)²
-
-    Parameters
-    ----------
-    original : np.ndarray
-        Orijinal görüntü – float32, 512×512.
-    decoded : np.ndarray
-        Decode edilmiş görüntü – float32, 512×512.
-
-    Returns
-    -------
-    float
-        MSE değeri (JSON serileştirmeye uygun saf Python float).
+    İki görüntü arasındaki kalite farkını MSE, PSNR ve SSIM ile hesaplar.
     """
-    mse = np.mean((original - decoded) ** 2)
-    return float(mse)
-
-
-def calculate_psnr(original: np.ndarray, decoded: np.ndarray) -> float:
-    """
-    İki görüntü matrisi arasındaki Peak Signal-to-Noise Ratio (PSNR) değerini hesaplar.
-
-    Normalize edilmiş görüntüler için MAX_I = 1.0 kabul edilir.
-
-    Formül:
-        PSNR = 10 · log₁₀(1.0² / MSE)
-
-    MSE sıfır ise (mükemmel yeniden oluşturma) numpy.inf döndürülür.
-
-    Parameters
-    ----------
-    original : np.ndarray
-        Orijinal görüntü – float32, 512×512.
-    decoded : np.ndarray
-        Decode edilmiş görüntü – float32, 512×512.
-
-    Returns
-    -------
-    float
-        PSNR değeri (dB cinsinden, JSON serileştirmeye uygun saf Python float).
-        Mükemmel eşleşmede numpy.inf döner.
-    """
-    mse = calculate_mse(original, decoded)
-
-    if mse == 0.0:
-        return float(np.inf)
-
-    psnr = 10.0 * np.log10(1.0 / mse)
-    return float(psnr)
-
+    # MSE: Mean Squared Error (Düşük olması daha iyidir)
+    # Pikseller arasındaki ortalama hata karesini ölçer.
+    mse_val = mse_metric(original_np, compressed_np)
+    
+    # PSNR: Peak Signal-to-Noise Ratio (Yüksek olması daha iyidir)
+    # Genelde 30 dB üstü insan gözü için 'iyi' kabul edilir.
+    psnr_val = psnr_metric(original_np, compressed_np)
+    
+    # SSIM: Structural Similarity Index (1.0'a yakın olması daha iyidir)
+    # Görüntünün dokusunu ve yapısını ne kadar koruduğunu ölçer.
+    ssim_val = ssim_metric(original_np, compressed_np, channel_axis=2)
+    
+    # Değerleri yuvarlayarak döndür: MSE, PSNR, SSIM
+    return round(mse_val, 2), round(psnr_val, 2), round(ssim_val, 4)

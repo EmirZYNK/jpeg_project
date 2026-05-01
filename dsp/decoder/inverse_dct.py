@@ -1,28 +1,32 @@
 import numpy as np
 from scipy.fftpack import idct
 
-def apply_2d_idct(block):
+def apply_idct_2d(block):
     """
-    8x8'lik tek bir frekans bloğuna Ters 2D Ayrık Kosinüs Dönüşümü (IDCT) uygular.
-    Pikselleri geri elde etmemizi sağlar.
+    8x8'lik bir frekans bloğunu tekrar piksel bloğuna çevirir (Ters Dönüşüm).
     """
-    # Type 3 IDCT, normalizasyon 'ortho' (ileri DCT'nin tam tersidir)
     return idct(idct(block.T, norm='ortho').T, norm='ortho')
 
-def process_image_idct(dct_coefficients):
+def blockwise_idct(dct_channel):
     """
-    Tüm DCT katsayısı matrisini alır, 8x8 bloklara böler ve 
-    her birine Ters DCT (IDCT) uygulayarak tam resmi yeniden oluşturur.
+    Tüm kanal üzerinde pencerelerle gezerek Ters DCT uygular.
     """
-    h, w = dct_coefficients.shape
-    reconstructed_image = np.zeros((h, w))
+    h, w = dct_channel.shape
+    reconstructed_image = np.zeros((h, w), dtype=np.float32)
     
     for i in range(0, h, 8):
         for j in range(0, w, 8):
-            block = dct_coefficients[i:i+8, j:j+8]
+            block = dct_channel[i:i+8, j:j+8]
             
-            # Kenarlarda 8x8'den küçük parça kalmaması için kontrol
-            if block.shape == (8, 8):
-                reconstructed_image[i:i+8, j:j+8] = apply_2d_idct(block)
-                
-    return reconstructed_image
+            # Ters DCT uygula
+            pixel_block = apply_idct_2d(block)
+            
+            # Hatırlarsan merkeze çekmek için DCT'den önce 128 çıkarmıştık.
+            # Şimdi 128 ekleyerek pikselleri 0-255 uzayına geri getiriyoruz.
+            pixel_block += 128.0
+            
+            reconstructed_image[i:i+8, j:j+8] = pixel_block
+            
+    # Pikseller matematiksel işlemlerden dolayı küsuratlı veya <0, >255 çıkabilir.
+    # Onları 0 ile 255 arasına sıkıştırıp tam sayı (uint8) yapıyoruz.
+    return np.clip(reconstructed_image, 0, 255).astype(np.uint8)

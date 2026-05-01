@@ -1,21 +1,30 @@
-import cv2 # OpenCV: Görüntü işleme kütüphanesi. Resimleri matris olarak okumamızı sağlar.
-import numpy as np # NumPy: Yüksek performanslı çok boyutlu diziler (matrisler) kütüphanesi.
+import numpy as np
+import cv2
 
-def rgb_to_ycbcr(image_np):
+def rgb_to_ycbcr(image_rgb):
     """
-    Bu fonksiyon RGB (Kırmızı-Yeşil-Mavi) formatındaki görüntüyü 
-    [span_3](start_span)YCbCr (Parlaklık-Mavi Farkı-Kırmızı Farkı) formatına dönüştürür[span_3](end_span).
+    RGB -> YCbCr dönüşümü yapar ve 4:2:0 Chroma Subsampling uygular.
+    Renk kanallarını (Cb, Cr) yarıya indirerek veri boyutunu %50 düşürür.
     """
+    img_array = np.array(image_rgb)
+    ycbcr_image = cv2.cvtColor(img_array, cv2.COLOR_RGB2YCrCb)
+    Y, Cr, Cb = cv2.split(ycbcr_image)
     
-    # cv2.cvtColor: Renk uzayı dönüşümü yapar. 
-    # cv2.COLOR_BGR2YCrCb: OpenCV resmi BGR (Mavi-Yeşil-Kırmızı) okuduğu için 
-    # onu doğrudan YCbCr'ye (Parlaklık ve Renk farkı kanalları) çeviririz.
-    ycbcr_image = cv2.cvtColor(image_np, cv2.COLOR_BGR2YCrCb)
+    # Renk kanallarını (Cb ve Cr) yarı yarıya küçültüyoruz (Subsampling)
+    Cb_sub = cv2.resize(Cb, (Cb.shape[1]//2, Cb.shape[0]//2), interpolation=cv2.INTER_AREA)
+    Cr_sub = cv2.resize(Cr, (Cr.shape[1]//2, Cr.shape[0]//2), interpolation=cv2.INTER_AREA)
     
-    # TERİM AÇIKLAMALARI VE BAĞLANTI:
-    # 1. Y (Luminance): Görüntünün parlaklık (siyah-beyaz) bilgisidir. İnsan gözü buna hassastır.
-    # 2. Cb/Cr (Chrominance): Renk farkı bilgileridir. İnsan gözü renkteki detaylara daha az hassastır.
-    # BAĞLANTI: Sıkıştırma algoritmaları (JPEG), insan gözünün zayıflığından faydalanmak için 
-    # Cb/Cr kanallarını Y kanalından ayırarak sadece renkleri daha fazla sıkıştırır.
+    return Y, Cb_sub, Cr_sub
+
+def ycbcr_to_rgb(Y, Cb_sub, Cr_sub):
+    """
+    Küçültülmüş renk kanallarını geri büyütür ve RGB'ye döner.
+    """
+    # Renk kanallarını tekrar orijinal Y boyuna getiriyoruz
+    Cb = cv2.resize(Cb_sub, (Y.shape[1], Y.shape[0]), interpolation=cv2.INTER_CUBIC)
+    Cr = cv2.resize(Cr_sub, (Y.shape[1], Y.shape[0]), interpolation=cv2.INTER_CUBIC)
     
-    return ycbcr_image
+    ycbcr_image = cv2.merge([Y, Cr, Cb])
+    rgb_image = cv2.cvtColor(ycbcr_image, cv2.COLOR_YCrCb2RGB)
+    
+    return rgb_image

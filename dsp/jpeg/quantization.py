@@ -1,7 +1,7 @@
 import numpy as np
 
-# Standart JPEG Parlaklık (Luminance) Tablosu
-JPEG_LUM_TABLE = np.array([
+# JPEG Standardı Parlaklık (Luminance - Y) Kuantizasyon Matrisi (Kalite 50 için)
+Q_Y = np.array([
     [16, 11, 10, 16, 24, 40, 51, 61],
     [12, 12, 14, 19, 26, 58, 60, 55],
     [14, 13, 16, 24, 40, 57, 69, 56],
@@ -12,51 +12,67 @@ JPEG_LUM_TABLE = np.array([
     [72, 92, 95, 98, 112, 100, 103, 99]
 ])
 
-def quantize_block(dct_block, quality=50):
+# JPEG Standardı Renk (Chrominance - Cb, Cr) Kuantizasyon Matrisi (Kalite 50 için)
+Q_C = np.array([
+    [17, 18, 24, 47, 99, 99, 99, 99],
+    [18, 21, 26, 66, 99, 99, 99, 99],
+    [24, 26, 56, 99, 99, 99, 99, 99],
+    [47, 66, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99],
+    [99, 99, 99, 99, 99, 99, 99, 99]
+])
+
+def get_scale_factor(quality):
+    """Kullanıcının arayüzden girdiği 1-100 arası kalite değerini JPEG standardı bir çarpana çevirir."""
+    if quality <= 0: quality = 1
+    if quality > 100: quality = 100
+    
     if quality < 50:
         scale = 5000 / quality
     else:
         scale = 200 - quality * 2
-    
-    q_table = np.floor((JPEG_LUM_TABLE * scale + 50) / 100)
-    q_table[q_table < 1] = 1 
-    
-    return np.round(dct_block / q_table)
+    return scale / 100.0
 
-def process_quantization(dct_coeffs, quality=50):
-    h, w = dct_coeffs.shape
-    quantized_coeffs = np.zeros((h, w))
+def blockwise_quantization(dct_channel, quality, is_luminance=True):
+    """
+    DCT uygulanmış kanalı alır, Q-matrisine bölerek yüksek frekansları sıfırlar.
+    İşte kayıplı sıkıştırma BURADA gerçekleşir. Çoğu piksel "0" olur.
+    """
+    scale = get_scale_factor(quality)
+    q_matrix = (Q_Y * scale) if is_luminance else (Q_C * scale)
+    
+    # 0'a bölme hatasını engellemek için minimum 1 yapıyoruz
+    q_matrix = np.maximum(q_matrix, 1)
+    
+    h, w = dct_channel.shape
+    quantized_channel = np.zeros_like(dct_channel)
     
     for i in range(0, h, 8):
         for j in range(0, w, 8):
-            block = dct_coeffs[i:i+8, j:j+8]
-            if block.shape == (8, 8):
-                quantized_coeffs[i:i+8, j:j+8] = quantize_block(block, quality)
-                
-    return quantized_coeffs 
+            block = dct_channel[i:i+8, j:j+8]
+            # Matrisi böl ve en yakın tam sayıya yuvarla (Çoğu değer sıfır olacak!)
+            quantized_channel[i:i+8, j:j+8] = np.round(block / q_matrix)
+            
+    return quantized_channel
 
-# --- YENİ EKLENEN KISIM (TERS KUANTİZASYON - DECODER İÇİN) ---
-
-def dequantize_block(quantized_block, quality=50):
-    if quality < 50:
-        scale = 5000 / quality
-    else:
-        scale = 200 - quality * 2
-        
-    q_table = np.floor((JPEG_LUM_TABLE * scale + 50) / 100)
-    q_table[q_table < 1] = 1 
+def blockwise_dequantization(quantized_channel, quality, is_luminance=True):
+    """
+    Sıkıştırılmış veriyi (sıfırlarla dolu matrisi) tekrar geri açmak (decoder) 
+    için kullanılır. Q-matrisi ile tekrar çarparız.
+    Ancak tam sayıya yuvarlandığı için orijinal veriyi %100 GERİ ELDE EDEMEYİZ.
+    """
+    scale = get_scale_factor(quality)
+    q_matrix = (Q_Y * scale) if is_luminance else (Q_C * scale)
+    q_matrix = np.maximum(q_matrix, 1)
     
-    # Geri Dönüşüm: Bölmek yerine ÇARPIYORUZ
-    return quantized_block * q_table
-
-def process_dequantization(quantized_coeffs, quality=50):
-    h, w = quantized_coeffs.shape
-    dequantized_coeffs = np.zeros((h, w))
+    h, w = quantized_channel.shape
+    dequantized_channel = np.zeros_like(quantized_channel, dtype=float)
     
     for i in range(0, h, 8):
         for j in range(0, w, 8):
-            block = quantized_coeffs[i:i+8, j:j+8]
-            if block.shape == (8, 8):
-                dequantized_coeffs[i:i+8, j:j+8] = dequantize_block(block, quality)
-                
-    return dequantized_coeffs
+            block = quantized_channel[i:i+8, j:j+8]
+            dequantized_channel[i:i+8, j:j+8] = block * q_matrix
+            
+    return dequantized_channel

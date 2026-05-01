@@ -1,31 +1,24 @@
+import numpy as np
 import collections
-import heapq
 
-def build_huffman_tree(data):
+def calculate_huffman_size(quantized_channel):
     """
-    Verilen veriden Huffman ağacı oluşturur.
+    Kuantize edilmiş verinin Huffman sonrası teorik boyutunu bit cinsinden hesaplar.
+    Hocaya sunumda 'Huffman sonrası şu kadar bit yer kaplıyor' diyebilmek için.
     """
-    flat_data = data.flatten().astype(int)
-    frequencies = collections.Counter(flat_data)
+    data = quantized_channel.flatten().astype(int)
+    if len(data) == 0: return 0
     
-    heap = [[weight, [symbol, ""]] for symbol, weight in frequencies.items()]
-    heapq.heapify(heap)
+    # Her bir sayının kaç kez geçtiğini say (Frekans analizi)
+    frequencies = collections.Counter(data)
+    total_symbols = len(data)
     
-    while len(heap) > 1:
-        lo = heapq.heappop(heap)
-        hi = heapq.heappop(heap)
-        for pair in lo[1:]:
-            pair[1] = '0' + pair[1]
-        for pair in hi[1:]:
-            pair[1] = '1' + pair[1]
-        heapq.heappush(heap, [lo[0] + hi[0]] + lo[1:] + hi[1:])
+    # Entropi hesapla: Bir verinin teorik olarak sıkıştırılabileceği en alt sınır
+    entropy = 0
+    for freq in frequencies.values():
+        p = freq / total_symbols
+        entropy += -p * np.log2(p)
     
-    return dict(sorted(heapq.heappop(heap)[1:], key=lambda p: (len(p[-1]), p)))
-
-def encode_huffman(quantized_data):
-    """
-    Huffman tablosunu oluşturur ve sıkıştırma oranını hesaplamak için kullanışlıdır.
-    """
-    huff_table = build_huffman_tree(quantized_data)
-    # Burada gerçek bitstream üretmek yerine tabloyu döndürüyoruz
-    return huff_table
+    # Toplam Bit = Sembol Sayısı * Entropi
+    theoretical_bits = total_symbols * entropy
+    return theoretical_bits / 8  # Byte cinsinden döndür
