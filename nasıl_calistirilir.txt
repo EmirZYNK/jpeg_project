@@ -1,6 +1,6 @@
 1- Bilgisayarında "Anaconda Prompt" uygulamasını bul ve yönetici olarak aç. 
 
-2- Terminalde proje klasörüne git: cd C:\dosya\yolu\jpeg-vs-jpeg2000
+2- Terminalde proje klasörüne git: cd C:\dosya\yolu\jpeg_project
 
 3- Şu komutları sırasıyla yapıştır:
     
