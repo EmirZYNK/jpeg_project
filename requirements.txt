@@ -6,3 +6,4 @@ PyWavelets
 opencv-python
 Pillow
 scikit-image
+matplotlib
