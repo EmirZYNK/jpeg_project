@@ -1,0 +1,14 @@
+1- Bilgisayarında "Anaconda Prompt" uygulamasını bul ve yönetici olarak aç. 
+
+2- Terminalde proje klasörüne git: cd C:\dosya\yolu\jpeg-vs-jpeg2000
+
+3- Şu komutları sırasıyla yapıştır:
+    
+    conda create -n img_comp_env python=3.10 -y (Ortamı kurar)
+    conda activate img_comp_env (Ortamı açar)
+    pip install -r requirements.txt (Kütüphaneleri indirir)
+    cd backend
+    python app.py (Sunucuyu başlatır)
+
+4- Tarayıcını aç ve şu adrese git: http://127.0.0.1:5000
+    
