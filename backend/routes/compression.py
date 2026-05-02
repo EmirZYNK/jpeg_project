@@ -47,7 +47,7 @@ def compress_image():
     # Parametreler
     wavelet_type = request.form.get('wavelet', 'bior4.4')
     decomposition_level = int(request.form.get('level', 2))
-    category = request.form.get('category', 'natural')
+    category = request.form.get('category', 'natural') # Arayüzden gelen kategori
     
     original_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(original_path)
@@ -73,13 +73,14 @@ def compress_image():
             q_estimate = max(1, int(95 / factor))
             dct_Y = blockwise_dct(Y); dct_Cb = blockwise_dct(Cb); dct_Cr = blockwise_dct(Cr)
             
-            q_Y = blockwise_quantization(dct_Y, q_estimate, True)
-            q_Cb = blockwise_quantization(dct_Cb, q_estimate, False)
-            q_Cr = blockwise_quantization(dct_Cr, q_estimate, False)
+            # GÜNCELLEME: category parametresini kuantizasyon fonksiyonlarına ekledik
+            q_Y = blockwise_quantization(dct_Y, q_estimate, True, category)
+            q_Cb = blockwise_quantization(dct_Cb, q_estimate, False, category)
+            q_Cr = blockwise_quantization(dct_Cr, q_estimate, False, category)
             
-            dq_Y = blockwise_dequantization(q_Y, q_estimate, True)
-            dq_Cb = blockwise_dequantization(q_Cb, q_estimate, False)
-            dq_Cr = blockwise_dequantization(q_Cr, q_estimate, False)
+            dq_Y = blockwise_dequantization(q_Y, q_estimate, True, category)
+            dq_Cb = blockwise_dequantization(q_Cb, q_estimate, False, category)
+            dq_Cr = blockwise_dequantization(q_Cr, q_estimate, False, category)
             
             final_np = ycbcr_to_rgb(blockwise_idct(dq_Y), blockwise_idct(dq_Cb), blockwise_idct(dq_Cr))
         else:
@@ -94,7 +95,6 @@ def compress_image():
             final_np = ycbcr_to_rgb(processed_channels[0], processed_channels[1], processed_channels[2])
 
         # 3. HIZLI HEDEF BOYUT DÖNGÜSÜ
-        # Artık sadece diske yazma kalitesini (quality) değiştiriyoruz (Çok Hızlı)
         final_image = Image.fromarray(final_np)
         current_q = 90
         while True:
@@ -103,7 +103,7 @@ def compress_image():
             
             if factor == 1 or current_size <= target_size or current_q <= 5:
                 break
-            current_q -= 5 # 5'er 5'er düşerek hedefi hızlıca bul
+            current_q -= 5 
 
         # Metrikler ve İstatistikler
         mse_s, psnr_s, ssim_s = calculate_metrics(img_np, final_np)
