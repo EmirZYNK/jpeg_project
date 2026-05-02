@@ -5,16 +5,23 @@ const compressBtn = document.getElementById('compressBtn');
 const originalPreview = document.getElementById('originalPreview');
 const algorithmSelect = document.getElementById('algorithmSelect');
 const jpeg2000Params = document.getElementById('jpeg2000Params');
+const targetHint = document.getElementById('targetHint');
 
 // Algoritma değişince JPEG2000 ayarlarını göster/gizle
 algorithmSelect.addEventListener('change', (e) => {
-    // Eğer jpeg2000 seçiliyse blok görünür, değilse gizli kalır
     jpeg2000Params.style.display = e.target.value === 'jpeg2000' ? 'block' : 'none';
 });
 
-// Slider değerini göster
+// Slider her değiştiğinde tahmini hedef boyutu göster (Dinamik Hesaplama)
 ratioSlider.addEventListener('input', (e) => {
-    ratioValue.innerText = e.target.value;
+    const factor = e.target.value;
+    ratioValue.innerText = factor;
+    
+    if (imageInput.files[0]) {
+        const originalSize = imageInput.files[0].size / 1024; // KB cinsinden
+        const targetSize = (originalSize / factor).toFixed(2);
+        targetHint.innerText = `Hedef Boyut: ~${targetSize} KB (${factor} kat küçültme)`;
+    }
 });
 
 // Orijinal resmi anında önizle
@@ -23,7 +30,13 @@ imageInput.addEventListener('change', (e) => {
     if (file) {
         originalPreview.src = URL.createObjectURL(file);
         document.getElementById('resultsArea').style.display = 'flex';
-        document.getElementById('originalStats').innerText = `Boyut: ${(file.size / 1024).toFixed(2)} KB`;
+        const sizeKB = (file.size / 1024).toFixed(2);
+        document.getElementById('originalStats').innerText = `Boyut: ${sizeKB} KB`;
+        
+        // Resim seçildiği an hedef boyutu hesapla
+        const factor = ratioSlider.value;
+        const targetSize = (sizeKB / factor).toFixed(2);
+        targetHint.innerText = `Hedef Boyut: ~${targetSize} KB (${factor} kat küçültme)`;
     }
 });
 
@@ -35,14 +48,14 @@ compressBtn.addEventListener('click', async () => {
     }
 
     const algorithm = algorithmSelect.value;
-    const ratio = ratioSlider.value;
+    const factor = ratioSlider.value; // Artık ratio yerine factor kullanıyoruz
 
     const formData = new FormData();
     formData.append('image', file);
     formData.append('algorithm', algorithm);
-    formData.append('ratio', ratio);
+    formData.append('factor', factor); // Backend'e 'factor' olarak gidiyor
     
-    // --- YENİ PARAMETRELERİ EKLE ---
+    // Diğer parametreler
     formData.append('category', document.getElementById('categorySelect').value);
     formData.append('wavelet', document.getElementById('waveletSelect').value);
     formData.append('level', document.getElementById('levelInput').value);
@@ -65,14 +78,14 @@ compressBtn.addEventListener('click', async () => {
             
             // İstatistikleri Güncelleme
             document.getElementById('originalStats').innerText = `Boyut: ${data.original_size_kb} KB`;
-            document.getElementById('compressedStats').innerText = `Yeni Boyut: ${data.compressed_size_kb} KB \n Sıkıştırma: %${data.compression_ratio}`;
+            document.getElementById('compressedStats').innerText = `Yeni Boyut: ${data.compressed_size_kb} KB \n Veri Azaltma Oranı: ${data.compression_ratio}x`;
             
-            // Metrikleri (MSE/PSNR/SSIM) Yazdırma
+            // Metrikleri Yazdırma
             document.getElementById('mseVal').innerText = data.mse;
             document.getElementById('psnrVal').innerText = data.psnr;
             document.getElementById('ssimVal').innerText = data.ssim;
 
-            // --- GRAFİĞİ GÖSTER (YENİ) ---
+            // Grafiği Göster
             if (data.plot_url) {
                 const plotImg = document.getElementById('comparisonPlot');
                 plotImg.src = data.plot_url;

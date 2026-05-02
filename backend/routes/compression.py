@@ -1,8 +1,6 @@
 from flask import Blueprint, request, jsonify
-import os
-import sys
+import os, sys, time
 import numpy as np
-import time
 from PIL import Image
 
 # Proje kök dizinini ekle
@@ -22,15 +20,31 @@ compression_bp = Blueprint('compression', __name__)
 UPLOAD_FOLDER = '../data/uploads'
 OUTPUT_FOLDER = '../data/outputs'
 
+def clear_folders():
+    """Dosya birikmesini önlemek için her işlemde klasörleri temizler."""
+    for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER]:
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder, filename)
+            try:
+                if os.path.isfile(file_path): os.unlink(file_path)
+            except Exception as e:
+                print(f"Temizlik hatası: {e}")
+
 @compression_bp.route('/compress', methods=['POST'])
 def compress_image():
+    # 0. Temizlik yap
+    clear_folders()
+
     if 'image' not in request.files:
         return jsonify({'error': 'Resim seçilmedi.'}), 400
 
     file = request.files['image']
     algorithm = request.form.get('algorithm')
-    comp_percent = int(request.form.get('ratio', 50))
+    factor = int(request.form.get('factor', 1))
     
+    # Parametreler
     wavelet_type = request.form.get('wavelet', 'bior4.4')
     decomposition_level = int(request.form.get('level', 2))
     category = request.form.get('category', 'natural')
@@ -38,88 +52,78 @@ def compress_image():
     original_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(original_path)
     original_size = os.path.getsize(original_path)
+    target_size = original_size / factor
 
-    output_filename = f"processed_{int(time.time())}.jpg"
+    output_filename = f"res_{int(time.time())}.jpg"
     output_path = os.path.join(OUTPUT_FOLDER, output_filename)
 
     try:
-        # 1. Görüntüyü Oku ve RGB'ye çevir
+        # 1. Görüntüyü Oku ve Standartlaştır
         img = Image.open(original_path).convert('RGB')
         w, h = img.size
-
-        # --- AKILLI KIRPMA (En-Boy Oranını Bozmaz) ---
-        # Genişlik ve yüksekliği 8'in en yakın alt katına çekiyoruz.
-        # Bu işlem JPEG/DCT'nin 8x8 blok yapısıyla tam uyum sağlar.
-        new_w = (w // 8) * 8
-        new_h = (h // 8) * 8
-        
-        # Eğer resim zaten 8'in katıysa bir şey yapmaz, değilse kenardan 1-7 piksel kırpar.
-        img = img.crop((0, 0, new_w, new_h))
-        
-        # Artık img_np her zaman DCT bloklarına tam uyumlu olacak
+        img = img.crop((0, 0, (w//8)*8, (h//8)*8))
         img_np = np.array(img)
         
         # 2. Renk Uzayı Dönüşümü
-        Y, Cb_sub, Cr_sub = rgb_to_ycbcr(img_np)
+        Y, Cb, Cr = rgb_to_ycbcr(img_np)
         
-        # --- DOĞRUSAL KALİTE HARİTALAMA ---
-        base_quality = int(85 - (comp_percent * 0.84))
-        test_q = max(1, base_quality)
-
+        # --- TEK SEFERLİK AĞIR MATEMATİKSEL İŞLEMLER ---
         if algorithm == 'jpeg':
-            dct_Y = blockwise_dct(Y); dct_Cb = blockwise_dct(Cb_sub); dct_Cr = blockwise_dct(Cr_sub)
-            q_Y = blockwise_quantization(dct_Y, test_q, is_luminance=True)
-            q_Cb = blockwise_quantization(dct_Cb, test_q, is_luminance=False)
-            q_Cr = blockwise_quantization(dct_Cr, test_q, is_luminance=False)
-            dq_Y = blockwise_dequantization(q_Y, test_q, is_luminance=True)
-            dq_Cb = blockwise_dequantization(q_Cb, test_q, is_luminance=False)
-            dq_Cr = blockwise_dequantization(q_Cr, test_q, is_luminance=False)
-            rec_Y = blockwise_idct(dq_Y); rec_Cb = blockwise_idct(dq_Cb); rec_Cr = blockwise_idct(dq_Cr)
-            final_np = ycbcr_to_rgb(rec_Y, rec_Cb, rec_Cr)
-
-        elif algorithm == 'jpeg2000':
+            # Kaliteyi katsayıya göre tahmin et ve bir kez IDCT yap
+            q_estimate = max(1, int(95 / factor))
+            dct_Y = blockwise_dct(Y); dct_Cb = blockwise_dct(Cb); dct_Cr = blockwise_dct(Cr)
+            
+            q_Y = blockwise_quantization(dct_Y, q_estimate, True)
+            q_Cb = blockwise_quantization(dct_Cb, q_estimate, False)
+            q_Cr = blockwise_quantization(dct_Cr, q_estimate, False)
+            
+            dq_Y = blockwise_dequantization(q_Y, q_estimate, True)
+            dq_Cb = blockwise_dequantization(q_Cb, q_estimate, False)
+            dq_Cr = blockwise_dequantization(q_Cr, q_estimate, False)
+            
+            final_np = ycbcr_to_rgb(blockwise_idct(dq_Y), blockwise_idct(dq_Cb), blockwise_idct(dq_Cr))
+        else:
+            # JPEG2000: DWT ve IDCT işlemlerini bir kez yap
             processed_channels = []
-            for channel in [Y, Cb_sub, Cr_sub]:
+            for channel in [Y, Cb, Cr]:
                 coeffs = apply_dwt_2d(channel, wavelet=wavelet_type, level=decomposition_level)
-                q_coeffs = adaptive_quantize_dwt(coeffs, comp_percent)
+                # factor'u threshold olarak kullan
+                q_coeffs = adaptive_quantize_dwt(coeffs, factor * 2) 
                 rec_channel = apply_idwt_2d(q_coeffs, wavelet=wavelet_type)
                 processed_channels.append(rec_channel[:channel.shape[0], :channel.shape[1]])
             final_np = ycbcr_to_rgb(processed_channels[0], processed_channels[1], processed_channels[2])
 
+        # 3. HIZLI HEDEF BOYUT DÖNGÜSÜ
+        # Artık sadece diske yazma kalitesini (quality) değiştiriyoruz (Çok Hızlı)
         final_image = Image.fromarray(final_np)
-
-        # --- HASSAS SIKIŞTIRMA KONTROLÜ ---
+        current_q = 90
         while True:
-            final_image.save(output_path, format='JPEG', quality=test_q, optimize=True, subsampling=2)
-            compressed_size = os.path.getsize(output_path)
+            final_image.save(output_path, format='JPEG', quality=current_q, optimize=True)
+            current_size = os.path.getsize(output_path)
             
-            if compressed_size >= original_size and test_q > 1:
-                test_q -= 1
-            else:
+            if factor == 1 or current_size <= target_size or current_q <= 5:
                 break
+            current_q -= 5 # 5'er 5'er düşerek hedefi hızlıca bul
 
-        real_ratio = round(((1 - (compressed_size / original_size)) * 100), 2)
-        if real_ratio < 0: real_ratio = 0.01
-
-        # Metrik Hesaplama (Shape hatası artık oluşmaz)
-        mse_score, psnr_score, ssim_score = calculate_metrics(img_np, final_np)
-
-        # Grafik Simülasyonu
+        # Metrikler ve İstatistikler
+        mse_s, psnr_s, ssim_s = calculate_metrics(img_np, final_np)
+        real_factor = round(original_size / current_size, 2)
+        
+        # Grafik Verisi (Simülasyon)
         ratios = [10, 30, 50, 70, 90]
-        jpeg_psnrs = [psnr_score + ((50-r)/5) for r in ratios]
-        j2k_psnrs = [psnr_score + ((50-r)/4) + 2 for r in ratios]
+        jpeg_psnrs = [psnr_s + ((50-r)/5) for r in ratios]
+        j2k_psnrs = [psnr_s + ((50-r)/4) + 2 for r in ratios]
         plot_url = generate_comparison_plot(ratios, jpeg_psnrs, j2k_psnrs)
 
         return jsonify({
             'compressed_url': f'/outputs/{output_filename}?t={int(time.time())}',
             'original_size_kb': round(original_size / 1024, 2),
-            'compressed_size_kb': round(compressed_size / 1024, 2),
+            'compressed_size_kb': round(current_size / 1024, 2),
             'algorithm': algorithm,
-            'compression_ratio': real_ratio,
-            'mse': mse_score,
-            'psnr': psnr_score,
-            'ssim': ssim_score,
-            'category': category,
+            'compression_ratio': real_factor,
+            'mse': mse_s,
+            'psnr': psnr_s,
+            'ssim': ssim_s,
             'plot_url': 'data:image/png;base64,' + plot_url
         }), 200
 
