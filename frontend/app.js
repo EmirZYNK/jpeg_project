@@ -84,6 +84,7 @@ compressBtn.addEventListener('click', async () => {
             document.getElementById('mseVal').innerText = data.mse;
             document.getElementById('psnrVal').innerText = data.psnr;
             document.getElementById('ssimVal').innerText = data.ssim;
+            document.getElementById('bppVal').innerText = data.bpp; // BPP Değeri Buraya Eklendi
 
             // Grafiği Göster
             if (data.plot_url) {
