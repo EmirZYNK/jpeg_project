@@ -45,6 +45,22 @@ Q_C_SYNTHETIC = Q_Y_SYNTHETIC  # Renkleri de keskin tutuyoruz
 Q_Y_BIOMEDICAL = np.ones((8, 8)) * 8 
 Q_C_BIOMEDICAL = np.ones((8, 8)) * 10
 
+# ---------------- 4. FINGERPRINT (PARMAK İZİ) MATRİSLERİ ----------------
+# Çizgilerin (ridges) yönünü ve çatallanmalarını (minutiae) bozmamak için
+# yüksek frekansları (sağ alt köşe) Doğal matrise göre çok daha fazla korur.
+Q_Y_FINGERPRINT = np.array([
+    [10, 10, 12, 14, 16, 18, 20, 22],
+    [10, 12, 14, 16, 18, 20, 22, 24],
+    [12, 14, 16, 18, 20, 22, 24, 26],
+    [14, 16, 18, 20, 22, 24, 26, 28],
+    [16, 18, 20, 22, 24, 26, 28, 30],
+    [18, 20, 22, 24, 26, 28, 30, 32],
+    [20, 22, 24, 26, 28, 30, 32, 34],
+    [22, 24, 26, 28, 30, 32, 34, 36]
+])
+# Parmak izleri genelde gri tonlamalıdır ama sistem çökmesin diye renk kanalını da veriyoruz
+Q_C_FINGERPRINT = Q_Y_FINGERPRINT
+
 
 def get_category_matrix(is_luminance, category):
     """Seçilen kategoriye uygun base matrisi döndürür."""
@@ -52,6 +68,8 @@ def get_category_matrix(is_luminance, category):
         return Q_Y_BIOMEDICAL if is_luminance else Q_C_BIOMEDICAL
     elif category == 'synthetic':
         return Q_Y_SYNTHETIC if is_luminance else Q_C_SYNTHETIC
+    elif category == 'fingerprint':
+        return Q_Y_FINGERPRINT if is_luminance else Q_C_FINGERPRINT
     else: # natural
         return Q_Y_NATURAL if is_luminance else Q_C_NATURAL
 
