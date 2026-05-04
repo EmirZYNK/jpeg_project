@@ -71,7 +71,6 @@ def compress_image():
         test_factors = [20, 15, 10, 5, 1] 
         
         # Orijinal RGB = 24 Bit. Çarpana bölerek tahmini BPP'yi (X Ekseni) buluyoruz
-        # Çıkan değerler: [1.2, 1.6, 2.4, 4.8, 24.0] bpp (Küçükten büyüğe sıralı)
         test_bpps = [round(24 / tf, 2) for tf in test_factors] 
         
         real_jpeg_psnrs = []
@@ -98,10 +97,13 @@ def compress_image():
             _, psnr_j, _ = calculate_metrics(img_np, rec_jpeg)
             real_jpeg_psnrs.append(psnr_j)
 
-            # --- JPEG2000 GERÇEK TESTİ ---
-            q_w_Y = adaptive_quantize_dwt(dwt_Y, tf * 2)
-            q_w_Cb = adaptive_quantize_dwt(dwt_Cb, tf * 2)
-            q_w_Cr = adaptive_quantize_dwt(dwt_Cr, tf * 2)
+            # --- JPEG2000 GERÇEK TESTİ (GÜNCELLENDİ) ---
+            # tf=1 (Orijinal) ise 1 gönderiyoruz ki kayıpsız (lossless) çalışsın
+            j2k_tf = 1 if tf == 1 else tf * 2
+            
+            q_w_Y = adaptive_quantize_dwt(dwt_Y, j2k_tf)
+            q_w_Cb = adaptive_quantize_dwt(dwt_Cb, j2k_tf)
+            q_w_Cr = adaptive_quantize_dwt(dwt_Cr, j2k_tf)
             
             rec_Y = apply_idwt_2d(q_w_Y, wavelet_type)[:Y.shape[0], :Y.shape[1]]
             rec_Cb = apply_idwt_2d(q_w_Cb, wavelet_type)[:Cb.shape[0], :Cb.shape[1]]
@@ -111,7 +113,7 @@ def compress_image():
             _, psnr_k, _ = calculate_metrics(img_np, rec_j2k)
             real_j2k_psnrs.append(psnr_k)
 
-        # Grafiği Çiz (Parametre olarak test_bpps gönderiyoruz)
+        # Grafiği Çiz
         plot_url = generate_comparison_plot(test_bpps, real_jpeg_psnrs, real_j2k_psnrs)
         # =====================================================================
 
@@ -151,17 +153,19 @@ def compress_image():
             final_np = ycbcr_to_rgb(blockwise_idct(dq_Y), blockwise_idct(dq_Cb), blockwise_idct(dq_Cr))
             
         else:
-            # JPEG2000 Asıl İşlem
-            q_coeffs_Y = adaptive_quantize_dwt(dwt_Y, factor * 2) 
-            q_coeffs_Cb = adaptive_quantize_dwt(dwt_Cb, factor * 2) 
-            q_coeffs_Cr = adaptive_quantize_dwt(dwt_Cr, factor * 2) 
+            # JPEG2000 Asıl İşlem (GÜNCELLENDİ)
+            # Seçilen çarpan 1 ise veriyi bozmuyoruz
+            final_j2k_factor = 1 if factor == 1 else factor * 2
+            
+            q_coeffs_Y = adaptive_quantize_dwt(dwt_Y, final_j2k_factor) 
+            q_coeffs_Cb = adaptive_quantize_dwt(dwt_Cb, final_j2k_factor) 
+            q_coeffs_Cr = adaptive_quantize_dwt(dwt_Cr, final_j2k_factor) 
             
             rec_Y = apply_idwt_2d(q_coeffs_Y, wavelet=wavelet_type)[:Y.shape[0], :Y.shape[1]]
             rec_Cb = apply_idwt_2d(q_coeffs_Cb, wavelet=wavelet_type)[:Cb.shape[0], :Cb.shape[1]]
             rec_Cr = apply_idwt_2d(q_coeffs_Cr, wavelet=wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
             
             final_np = ycbcr_to_rgb(rec_Y, rec_Cb, rec_Cr)
-            # JPEG2000 için hedef boyuta göre BPP hesabı
             calculated_bpp = round((target_size * 8) / total_pixels, 3)
 
         # 4. ÇIKTIYI DOSYAYA KAYDETME
