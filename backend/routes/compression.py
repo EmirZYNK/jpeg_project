@@ -41,7 +41,7 @@ def compress_image():
     if 'image' not in request.files: return jsonify({'error': 'Resim seçilmedi.'}), 400
 
     file = request.files['image']
-    mode = request.form.get('mode', 'analysis') # 'analysis' veya 'comparison'
+    mode = request.form.get('mode', 'analysis') 
     algorithm = request.form.get('algorithm')
     factor = int(request.form.get('factor', 1))
     
@@ -55,26 +55,24 @@ def compress_image():
     target_size = original_size / factor
 
     try:
-        # 1. Görüntü Hazırlığı ve Ortak Dönüşümler
+        # 1. Görüntü Hazırlığı
         img = Image.open(original_path).convert('RGB')
         w, h = img.size
         img = img.crop((0, 0, (w//8)*8, (h//8)*8))
         img_np = np.array(img)
         Y, Cb, Cr = rgb_to_ycbcr(img_np)
         
-        # Grafik için önceden hazırlanan dönüşümler (Hız için 1 kez yapılıyor)
         dct_Y = blockwise_dct(Y); dct_Cb = blockwise_dct(Cb); dct_Cr = blockwise_dct(Cr)
         dwt_Y = apply_dwt_2d(Y, wavelet_type, decomposition_level)
         dwt_Cb = apply_dwt_2d(Cb, wavelet_type, decomposition_level)
         dwt_Cr = apply_dwt_2d(Cr, wavelet_type, decomposition_level)
 
-        # 2. GRAFİK VERİ ÜRETİMİ (RD CURVE)
+        # 2. RD CURVE VERİSİ
         test_factors = [20, 15, 10, 5, 1] 
         test_bpps = [round(24 / tf, 2) for tf in test_factors] 
         real_jpeg_psnrs, real_j2k_psnrs = [], []
 
         for tf in test_factors:
-            # JPEG Test
             q_est = max(1, int(95 / tf))
             rec_j = ycbcr_to_rgb(
                 blockwise_idct(blockwise_dequantization(blockwise_quantization(dct_Y, q_est, True, category), q_est, True, category)),
@@ -83,7 +81,6 @@ def compress_image():
             )
             real_jpeg_psnrs.append(calculate_metrics(img_np, rec_j)[1])
 
-            # J2K Test
             j2k_tf = 1 if tf == 1 else tf * 2
             rec_k = ycbcr_to_rgb(
                 apply_idwt_2d(adaptive_quantize_dwt(dwt_Y, j2k_tf), wavelet_type)[:Y.shape[0], :Y.shape[1]],
@@ -94,7 +91,7 @@ def compress_image():
 
         plot_url = generate_comparison_plot(test_bpps, real_jpeg_psnrs, real_j2k_psnrs)
 
-        # 3. YARDIMCI MOTOR FONKSİYONLARI
+        # 3. MOTORLAR
         total_pixels = img_np.shape[0] * img_np.shape[1]
 
         def get_jpeg_result():
@@ -103,7 +100,6 @@ def compress_image():
             q_Cb = blockwise_quantization(dct_Cb, q_est, False, category)
             q_Cr = blockwise_quantization(dct_Cr, q_est, False, category)
             
-            # Huffman BPP Hesabı
             total_bits = 0
             for channel in [q_Y, q_Cb, q_Cr]:
                 prev_dc = 0
@@ -134,15 +130,26 @@ def compress_image():
             )
             return res_np, round((target_size * 8) / total_pixels, 3)
 
+        # BURASI KRİTİK: DOSYA BOYUTUNU ZORLA DÜŞÜREN FONKSİYON
         def save_and_eval(np_img, prefix):
             out_name = f"{prefix}_{int(time.time())}.jpg"
             out_path = os.path.join(OUTPUT_FOLDER, out_name)
-            # Kayıt sırasında ek sıkıştırma olmaması için yüksek kalite (95) kullanıyoruz
-            Image.fromarray(np_img).save(out_path, format='JPEG', quality=95)
+            pil_img = Image.fromarray(np_img)
+            
+            # Akıllı Boyut Kontrolü (Iterative Compression)
+            current_q = 95
+            while True:
+                pil_img.save(out_path, format='JPEG', quality=current_q, optimize=True)
+                current_size = os.path.getsize(out_path)
+                # Eğer factor 1 ise veya hedef boyuta ulaştıysak veya kalite çok düştüyse dur
+                if factor == 1 or current_size <= target_size or current_q <= 10:
+                    break
+                current_q -= 5 # Hedefe ulaşana kadar kaliteyi 5'er 5'er düşür
+
             mse, psnr, ssim = calculate_metrics(img_np, np_img)
             return out_name, os.path.getsize(out_path), mse, psnr, ssim
 
-        # 4. MODA GÖRE ÇIKTI ÜRETİMİ
+        # 4. MODA GÖRE ÇIKTI
         if mode == 'comparison':
             jpeg_np, j_bpp = get_jpeg_result()
             j2k_np, k_bpp = get_j2k_result()

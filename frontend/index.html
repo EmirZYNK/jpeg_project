@@ -24,7 +24,7 @@
                 <div id="sidebarFileName" class="file-name-hint">Henüz resim seçilmedi</div>
             </div>
 
-            <!-- MOD SEÇİCİ (YENİ) -->
+            <!-- MOD SEÇİCİ -->
             <div class="control-group mode-toggle">
                 <label style="margin-bottom: 10px; display: block;">Çalışma Modu:</label>
                 <div class="radio-group">
@@ -54,7 +54,6 @@
                 </select>
             </div>
             
-            <!-- DWT Parametreleri (JPEG 2000 Seçilince Açılır) -->
             <div id="jpeg2000Params" class="dwt-params" style="display: none;">
                 <div class="control-group">
                     <label>Wavelet:</label>
@@ -82,14 +81,12 @@
         <!-- SAĞ ÇALIŞMA ALANI -->
         <main class="workspace">
             <div class="image-workspace" id="imageWorkspace">
-                <!-- Resim Yokken Gözükecek Alan -->
                 <div class="upload-placeholder" id="uploadPlaceholder">
                     <div class="icon">🖼️</div>
                     <h3>Resim Yüklemek İçin Tıklayın</h3>
                     <p>veya sol menüden dosya seçin</p>
                 </div>
 
-                <!-- Karşılaştırma Slider Alanı -->
                 <div class="comparison-container" id="compContainer" style="display: none;">
                     <span class="img-label left-label" id="leftLabel">İşlenmiş</span>
                     <span class="img-label right-label" id="rightLabel">Orijinal</span>
@@ -102,7 +99,7 @@
                 </div>
             </div>
 
-            <!-- ANALİZ MODU İSTATİSTİKLERİ (Mod: Analysis) -->
+            <!-- ANALİZ MODU İSTATİSTİKLERİ -->
             <div class="stats-row" id="statsRowAnalysis" style="display: none;">
                 <div class="stat-card">
                     <h4>Orijinal Resim</h4>
@@ -123,7 +120,7 @@
                 </div>
             </div>
 
-            <!-- KARŞILAŞTIRMA MODU İSTATİSTİKLERİ (Mod: Comparison) -->
+            <!-- KARŞILAŞTIRMA MODU İSTATİSTİKLERİ -->
             <div class="stats-row" id="statsRowComparison" style="display: none;">
                 <div class="stat-card">
                     <h4>JPEG (Sol Taraf)</h4>
@@ -141,11 +138,15 @@
                     <h4>Detaylı Analiz</h4>
                     <div class="stat-item">SSIM (JPEG): <span id="jSsim">-</span></div>
                     <div class="stat-item">SSIM (J2K): <span id="kSsim">-</span></div>
-                    <div class="stat-item" style="margin-top: 5px; border-top: 1px solid #45475a; padding-top: 5px;">Orijinal: <span id="origSizeComp">-</span> KB</div>
+                    
+                    <!-- YENİ EKLENEN MSE SATIRLARI -->
+                    <div class="stat-item">MSE (JPEG): <span id="jMse">-</span></div>
+                    <div class="stat-item">MSE (J2K): <span id="kMse">-</span></div>
+                    
+                    <div class="stat-item" style="margin-top: 5px; border-top: 1px solid #45475a; padding-top: 5px;">Orijinal Boyut: <span id="origSizeComp">-</span> KB</div>
                 </div>
             </div>
 
-            <!-- Grafik Alanı (RD Eğrisi) -->
             <div class="graph-row" id="graphRow" style="display: none;">
                 <img id="comparisonPlot" src="" alt="Rate-Distortion Eğrisi">
             </div>

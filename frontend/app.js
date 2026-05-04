@@ -133,7 +133,7 @@ compressBtn.addEventListener('click', async () => {
                 // KARŞILAŞTIRMA MODU SONUÇLARI
                 compressedImage.src = data.jpeg_url; // Sol taraf: JPEG
                 compressedImage.style.display = 'block';
-                originalImage.src = data.j2k_url;    // Sağ taraf: JPEG 2000 (Orijinal slotunu J2K için kullanıyoruz)
+                originalImage.src = data.j2k_url;    // Sağ taraf: JPEG 2000
                 
                 document.getElementById('statsRowAnalysis').style.display = 'none';
                 document.getElementById('statsRowComparison').style.display = 'grid';
@@ -143,12 +143,14 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('jBpp').innerText = data.jpeg_stats.bpp;
                 document.getElementById('jPsnr').innerText = data.jpeg_stats.psnr;
                 document.getElementById('jSsim').innerText = data.jpeg_stats.ssim;
+                document.getElementById('jMse').innerText = data.jpeg_stats.mse; // YENİ EKLENDİ
 
                 // J2K İstatistikleri
                 document.getElementById('kSize').innerText = data.j2k_stats.size;
                 document.getElementById('kBpp').innerText = data.j2k_stats.bpp;
                 document.getElementById('kPsnr').innerText = data.j2k_stats.psnr;
                 document.getElementById('kSsim').innerText = data.j2k_stats.ssim;
+                document.getElementById('kMse').innerText = data.j2k_stats.mse; // YENİ EKLENDİ
 
             } else {
                 // ANALİZ MODU SONUÇLARI
@@ -185,7 +187,7 @@ compressBtn.addEventListener('click', async () => {
         }
     } catch (error) {
         console.error(error);
-        alert("Bağlantı hatası! Lütfen backend'in çalıştığından emin olun.");
+        alert("Bağlantı hatası!");
     } finally {
         compressBtn.innerText = "Sıkıştırmayı Başlat";
         compressBtn.disabled = false;
