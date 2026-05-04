@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JPEG vs JPEG2000 Projesi</title>
+    <title>JPEG vs JPEG 2000 - Professional Image Compression Suite</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Üst Bar -->
     <header class="top-bar">
-        <h1>Image Compressor</h1>
+        <h1>Image Compression Lab</h1>
     </header>
 
-    <!-- Gizli Dosya Seçici (İki taraftan da bunu tetikleyeceğiz) -->
+    <!-- Gizli Dosya Girişi -->
     <input type="file" id="hiddenFileInput" accept="image/png, image/jpeg" style="display: none;">
 
     <div class="app-layout">
@@ -25,6 +24,18 @@
                 <div id="sidebarFileName" class="file-name-hint">Henüz resim seçilmedi</div>
             </div>
 
+            <!-- MOD SEÇİCİ (YENİ) -->
+            <div class="control-group mode-toggle">
+                <label style="margin-bottom: 10px; display: block;">Çalışma Modu:</label>
+                <div class="radio-group">
+                    <input type="radio" id="modeAnalysis" name="appMode" value="analysis" checked>
+                    <label for="modeAnalysis">🔍 Analiz (Orijinal vs İşlenmiş)</label>
+                    
+                    <input type="radio" id="modeComparison" name="appMode" value="comparison">
+                    <label for="modeComparison">⚖️ Karşılaştırma (JPEG vs J2K)</label>
+                </div>
+            </div>
+
             <div class="control-group">
                 <label>Görüntü Kategorisi:</label>
                 <select id="categorySelect">
@@ -35,14 +46,15 @@
                 </select>
             </div>
 
-            <div class="control-group">
-                <label>Algoritma:</label>
+            <div class="control-group" id="algoControlGroup">
+                <label>Algoritma (Analiz Modu İçin):</label>
                 <select id="algorithmSelect">
                     <option value="jpeg">JPEG (DCT Tabanlı)</option>
                     <option value="jpeg2000">JPEG 2000 (DWT Tabanlı)</option>
                 </select>
             </div>
             
+            <!-- DWT Parametreleri (JPEG 2000 Seçilince Açılır) -->
             <div id="jpeg2000Params" class="dwt-params" style="display: none;">
                 <div class="control-group">
                     <label>Wavelet:</label>
@@ -53,7 +65,7 @@
                     </select>
                 </div>
                 <div class="control-group">
-                    <label>Seviye:</label>
+                    <label>Seviye (Decomposition):</label>
                     <input type="number" id="levelInput" min="1" max="5" value="2">
                 </div>
             </div>
@@ -61,56 +73,48 @@
             <div class="control-group slider-container">
                 <label>Sıkıştırma Çarpanı: <b class="highlight"><span id="ratioValue">1</span>x</b></label>
                 <input type="range" id="ratioSlider" min="1" max="20" value="1" step="1">
-                <small id="targetHint">Orijinal Kalite</small>
+                <small id="targetHint">Orijinal Kalite (24 BPP)</small>
             </div>
 
             <button id="compressBtn" class="primary-btn">Sıkıştırmayı Başlat</button>
         </aside>
 
-        <!-- SAĞ ÇALIŞMA ALANI (Workspace) -->
+        <!-- SAĞ ÇALIŞMA ALANI -->
         <main class="workspace">
-            
-            <!-- Dev Resim Alanı -->
             <div class="image-workspace" id="imageWorkspace">
-                <!-- Resim Yokken Gözükecek Yükleme Alanı -->
+                <!-- Resim Yokken Gözükecek Alan -->
                 <div class="upload-placeholder" id="uploadPlaceholder">
                     <div class="icon">🖼️</div>
                     <h3>Resim Yüklemek İçin Tıklayın</h3>
-                    <p>veya sol menüyü kullanın</p>
+                    <p>veya sol menüden dosya seçin</p>
                 </div>
 
-                <!-- Resim Yüklendiğinde Gözükecek Slider Alanı -->
+                <!-- Karşılaştırma Slider Alanı -->
                 <div class="comparison-container" id="compContainer" style="display: none;">
-                    <!-- Etiketler -->
-                    <span class="img-label left-label">İşlenmiş Resim</span>
-                    <span class="img-label right-label">Orijinal Resim</span>
+                    <span class="img-label left-label" id="leftLabel">İşlenmiş</span>
+                    <span class="img-label right-label" id="rightLabel">Orijinal</span>
 
-                    <img id="originalImage" src="" alt="Orijinal">
-                    <img id="compressedImage" src="" alt="Sıkıştırılmış">
+                    <img id="originalImage" src="" alt="Sağ Resim">
+                    <img id="compressedImage" src="" alt="Sol Resim">
                     
                     <input type="range" min="0" max="100" value="50" class="slider-overlay" id="compareSlider">
                     <div class="slider-line" id="sliderLine"></div>
                 </div>
             </div>
 
-            <!-- İstatistikler Alanı (Resmin Altında, Yan Yana) -->
-            <div class="stats-row" id="statsRow" style="display: none;">
-                <!-- Orijinal -->
+            <!-- ANALİZ MODU İSTATİSTİKLERİ (Mod: Analysis) -->
+            <div class="stats-row" id="statsRowAnalysis" style="display: none;">
                 <div class="stat-card">
                     <h4>Orijinal Resim</h4>
                     <div class="stat-item">Boyut: <span id="origSize">-</span> KB</div>
                     <div class="stat-item">Bitrate: <span>24.00</span> BPP</div>
                 </div>
-
-                <!-- İşlenmiş -->
                 <div class="stat-card">
                     <h4>Sıkıştırılmış (<span id="resultAlgo">-</span>)</h4>
                     <div class="stat-item">Boyut: <span id="compSize" class="highlight">-</span> KB</div>
                     <div class="stat-item">Bitrate: <span id="compBpp" class="highlight">-</span> BPP</div>
                     <div class="stat-item">Oran: <span id="compRatio" class="highlight">-</span>x</div>
                 </div>
-
-                <!-- Metrikler -->
                 <div class="stat-card">
                     <h4>Kalite Metrikleri</h4>
                     <div class="stat-item">PSNR: <span id="psnrVal">-</span> dB</div>
@@ -119,11 +123,32 @@
                 </div>
             </div>
 
-            <!-- Grafik Alanı (En Altta) -->
-            <div class="graph-row" id="graphRow" style="display: none;">
-                <img id="comparisonPlot" src="" alt="Performans Grafiği">
+            <!-- KARŞILAŞTIRMA MODU İSTATİSTİKLERİ (Mod: Comparison) -->
+            <div class="stats-row" id="statsRowComparison" style="display: none;">
+                <div class="stat-card">
+                    <h4>JPEG (Sol Taraf)</h4>
+                    <div class="stat-item">Boyut: <span id="jSize" class="highlight">-</span> KB</div>
+                    <div class="stat-item">Bitrate: <span id="jBpp" class="highlight">-</span> BPP</div>
+                    <div class="stat-item">PSNR: <span id="jPsnr" class="highlight">-</span> dB</div>
+                </div>
+                <div class="stat-card">
+                    <h4>JPEG 2000 (Sağ Taraf)</h4>
+                    <div class="stat-item">Boyut: <span id="kSize" class="highlight">-</span> KB</div>
+                    <div class="stat-item">Bitrate: <span id="kBpp" class="highlight">-</span> BPP</div>
+                    <div class="stat-item">PSNR: <span id="kPsnr" class="highlight">-</span> dB</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Detaylı Analiz</h4>
+                    <div class="stat-item">SSIM (JPEG): <span id="jSsim">-</span></div>
+                    <div class="stat-item">SSIM (J2K): <span id="kSsim">-</span></div>
+                    <div class="stat-item" style="margin-top: 5px; border-top: 1px solid #45475a; padding-top: 5px;">Orijinal: <span id="origSizeComp">-</span> KB</div>
+                </div>
             </div>
 
+            <!-- Grafik Alanı (RD Eğrisi) -->
+            <div class="graph-row" id="graphRow" style="display: none;">
+                <img id="comparisonPlot" src="" alt="Rate-Distortion Eğrisi">
+            </div>
         </main>
     </div>
     <script src="app.js"></script>
