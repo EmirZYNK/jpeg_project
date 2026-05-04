@@ -91,7 +91,7 @@ def compress_image():
 
         plot_url = generate_comparison_plot(test_bpps, real_jpeg_psnrs, real_j2k_psnrs)
 
-        # 3. MOTORLAR
+        # 3. YARDIMCI MOTOR FONKSİYONLARI
         total_pixels = img_np.shape[0] * img_np.shape[1]
 
         def get_jpeg_result():
@@ -100,26 +100,12 @@ def compress_image():
             q_Cb = blockwise_quantization(dct_Cb, q_est, False, category)
             q_Cr = blockwise_quantization(dct_Cr, q_est, False, category)
             
-            total_bits = 0
-            for channel in [q_Y, q_Cb, q_Cr]:
-                prev_dc = 0
-                symbols = []
-                for i in range(0, channel.shape[0], 8):
-                    for j in range(0, channel.shape[1], 8):
-                        z = block_to_zigzag(channel[i:i+8, j:j+8])
-                        dc_diff, rle = encode_block(z, prev_dc)
-                        prev_dc = z[0]
-                        symbols.append(str(dc_diff))
-                        symbols.extend([str(x) for x in rle])
-                bitstream, _ = huffman_encode(symbols)
-                total_bits += len(bitstream)
-            
             res_np = ycbcr_to_rgb(
                 blockwise_idct(blockwise_dequantization(q_Y, q_est, True, category)),
                 blockwise_idct(blockwise_dequantization(q_Cb, q_est, False, category)),
                 blockwise_idct(blockwise_dequantization(q_Cr, q_est, False, category))
             )
-            return res_np, round(total_bits / total_pixels, 3)
+            return res_np
 
         def get_j2k_result():
             j2k_f = 1 if factor == 1 else factor * 2
@@ -128,34 +114,35 @@ def compress_image():
                 apply_idwt_2d(adaptive_quantize_dwt(dwt_Cb, j2k_f), wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
                 apply_idwt_2d(adaptive_quantize_dwt(dwt_Cr, j2k_f), wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
             )
-            return res_np, round((target_size * 8) / total_pixels, 3)
+            return res_np
 
-        # BURASI KRİTİK: DOSYA BOYUTUNU ZORLA DÜŞÜREN FONKSİYON
         def save_and_eval(np_img, prefix):
             out_name = f"{prefix}_{int(time.time())}.jpg"
             out_path = os.path.join(OUTPUT_FOLDER, out_name)
             pil_img = Image.fromarray(np_img)
             
-            # Akıllı Boyut Kontrolü (Iterative Compression)
+            # Akıllı Boyut Kontrolü: Hedef KB değerini tutturana kadar JPEG kalitesini optimize et
             current_q = 95
             while True:
                 pil_img.save(out_path, format='JPEG', quality=current_q, optimize=True)
                 current_size = os.path.getsize(out_path)
-                # Eğer factor 1 ise veya hedef boyuta ulaştıysak veya kalite çok düştüyse dur
-                if factor == 1 or current_size <= target_size or current_q <= 10:
+                if factor == 1 or current_size <= target_size or current_q <= 5:
                     break
-                current_q -= 5 # Hedefe ulaşana kadar kaliteyi 5'er 5'er düşür
+                current_q -= 5 
 
             mse, psnr, ssim = calculate_metrics(img_np, np_img)
-            return out_name, os.path.getsize(out_path), mse, psnr, ssim
-
-        # 4. MODA GÖRE ÇIKTI
-        if mode == 'comparison':
-            jpeg_np, j_bpp = get_jpeg_result()
-            j2k_np, k_bpp = get_j2k_result()
+            # Gerçek BPP Hesabı: (Boyut_Byte * 8) / Toplam_Piksel
+            real_bpp = round((current_size * 8) / total_pixels, 3)
             
-            j_name, j_size, j_mse, j_psnr, j_ssim = save_and_eval(jpeg_np, "comp_jpeg")
-            k_name, k_size, k_mse, k_psnr, k_ssim = save_and_eval(j2k_np, "comp_j2k")
+            return out_name, current_size, mse, psnr, ssim, real_bpp
+
+        # 4. MODA GÖRE ÇIKTI ÜRETİMİ
+        if mode == 'comparison':
+            jpeg_np = get_jpeg_result()
+            j2k_np = get_j2k_result()
+            
+            j_name, j_size, j_mse, j_psnr, j_ssim, j_bpp = save_and_eval(jpeg_np, "comp_jpeg")
+            k_name, k_size, k_mse, k_psnr, k_ssim, k_bpp = save_and_eval(j2k_np, "comp_j2k")
             
             return jsonify({
                 'mode': 'comparison',
@@ -168,8 +155,8 @@ def compress_image():
             }), 200
 
         else: # Analysis Mode
-            final_np, calc_bpp = get_jpeg_result() if algorithm == 'jpeg' else get_j2k_result()
-            out_name, out_size, mse, psnr, ssim = save_and_eval(final_np, "single")
+            final_np = get_jpeg_result() if algorithm == 'jpeg' else get_j2k_result()
+            out_name, out_size, mse, psnr, ssim, res_bpp = save_and_eval(final_np, "single")
             
             return jsonify({
                 'mode': 'analysis',
@@ -178,7 +165,7 @@ def compress_image():
                 'compressed_size_kb': round(out_size / 1024, 2),
                 'algorithm': algorithm,
                 'compression_ratio': round(original_size / out_size, 2),
-                'bpp': calc_bpp, 'mse': mse, 'psnr': psnr, 'ssim': ssim,
+                'bpp': res_bpp, 'mse': mse, 'psnr': psnr, 'ssim': ssim,
                 'plot_url': 'data:image/png;base64,' + plot_url
             }), 200
 
