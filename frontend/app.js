@@ -29,27 +29,29 @@ modeRadios.forEach(radio => {
     radio.addEventListener('change', (e) => {
         const mode = e.target.value;
         if (mode === 'comparison') {
-            // Karşılaştırma modunda algoritma seçmeye gerek yok (ikisi de çalışacak)
             algoControlGroup.style.display = 'none';
-            jpeg2000Params.style.display = 'flex'; // J2K ayarları her zaman açık olsun
+            jpeg2000Params.style.display = 'flex'; 
+            // KARŞILAŞTIRMA MODU ETİKETLERİ
             leftLabel.innerText = 'JPEG (DCT)';
             rightLabel.innerText = 'JPEG 2000 (DWT)';
+            leftLabel.style.color = '#a6e3a1'; // Yeşil
+            rightLabel.style.color = '#89b4fa'; // Mavi
         } else {
-            // Analiz moduna geri dön
             algoControlGroup.style.display = 'flex';
             jpeg2000Params.style.display = algorithmSelect.value === 'jpeg2000' ? 'flex' : 'none';
+            // ANALİZ MODU ETİKETLERİ
             leftLabel.innerText = 'İşlenmiş Resim';
             rightLabel.innerText = 'Orijinal Resim';
+            leftLabel.style.color = '#a6e3a1'; // Varsayılan yeşil
+            rightLabel.style.color = '#cdd6f4'; // Orijinal için beyaz/gri tonu
         }
     });
 });
 
-// Algoritma değişince parametreleri göster/gizle (Sadece Analiz modunda aktif)
 algorithmSelect.addEventListener('change', (e) => {
     jpeg2000Params.style.display = e.target.value === 'jpeg2000' ? 'flex' : 'none';
 });
 
-// Sıkıştırma çarpanı değiştikçe BPP tahmini yap
 ratioSlider.addEventListener('input', (e) => {
     const factor = e.target.value;
     ratioValue.innerText = factor;
@@ -68,19 +70,16 @@ hiddenFileInput.addEventListener('change', (e) => {
         sidebarFileName.innerText = file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name;
         originalImage.src = URL.createObjectURL(file);
         
-        // Arayüzü sıfırla
         uploadPlaceholder.style.display = 'none';
         compContainer.style.display = 'block';
         compressedImage.style.display = 'none'; 
         compareSlider.style.display = 'none';
         sliderLine.style.display = 'none';
         
-        // Sonuç panellerini gizle
         document.getElementById('statsRowAnalysis').style.display = 'none';
         document.getElementById('statsRowComparison').style.display = 'none';
         document.getElementById('graphRow').style.display = 'none';
         
-        // Boyut bilgilerini hazırla
         const sizeKB = (file.size / 1024).toFixed(2);
         document.getElementById('origSize').innerText = sizeKB;
         document.getElementById('origSizeComp').innerText = sizeKB;
@@ -122,7 +121,6 @@ compressBtn.addEventListener('click', async () => {
         const data = await response.json();
 
         if (response.ok) {
-            // Slider Ayarlarını Sıfırla
             compareSlider.style.display = 'block';
             sliderLine.style.display = 'block';
             compareSlider.value = 50;
@@ -130,10 +128,10 @@ compressBtn.addEventListener('click', async () => {
             sliderLine.style.left = '50%';
 
             if (data.mode === 'comparison') {
-                // KARŞILAŞTIRMA MODU SONUÇLARI
-                compressedImage.src = data.jpeg_url; // Sol taraf: JPEG
+                // KARŞILAŞTIRMA MODU: SOL = JPEG, SAĞ = J2K
+                compressedImage.src = data.jpeg_url; 
                 compressedImage.style.display = 'block';
-                originalImage.src = data.j2k_url;    // Sağ taraf: JPEG 2000
+                originalImage.src = data.j2k_url;    
                 
                 document.getElementById('statsRowAnalysis').style.display = 'none';
                 document.getElementById('statsRowComparison').style.display = 'grid';
@@ -143,20 +141,20 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('jBpp').innerText = data.jpeg_stats.bpp;
                 document.getElementById('jPsnr').innerText = data.jpeg_stats.psnr;
                 document.getElementById('jSsim').innerText = data.jpeg_stats.ssim;
-                document.getElementById('jMse').innerText = data.jpeg_stats.mse; // YENİ EKLENDİ
+                document.getElementById('jMse').innerText = data.jpeg_stats.mse;
 
                 // J2K İstatistikleri
                 document.getElementById('kSize').innerText = data.j2k_stats.size;
                 document.getElementById('kBpp').innerText = data.j2k_stats.bpp;
                 document.getElementById('kPsnr').innerText = data.j2k_stats.psnr;
                 document.getElementById('kSsim').innerText = data.j2k_stats.ssim;
-                document.getElementById('kMse').innerText = data.j2k_stats.mse; // YENİ EKLENDİ
+                document.getElementById('kMse').innerText = data.j2k_stats.mse;
 
             } else {
-                // ANALİZ MODU SONUÇLARI
-                compressedImage.src = data.compressed_url; // Sol taraf: İşlenmiş
+                // ANALİZ MODU: SOL = İŞLENMİŞ, SAĞ = ORİJİNAL
+                compressedImage.src = data.compressed_url;
                 compressedImage.style.display = 'block';
-                originalImage.src = URL.createObjectURL(file); // Sağ taraf: Gerçek Orijinal
+                originalImage.src = URL.createObjectURL(file);
                 
                 document.getElementById('statsRowComparison').style.display = 'none';
                 document.getElementById('statsRowAnalysis').style.display = 'grid';
@@ -170,12 +168,9 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('mseVal').innerText = data.mse;
             }
 
-            // Performans Grafiğini Yükle (RD-Curve)
             if (data.plot_url) {
                 document.getElementById('comparisonPlot').src = data.plot_url;
                 document.getElementById('graphRow').style.display = 'block';
-                
-                // Sonuçlar hazır olduğunda aşağı kaydır
                 setTimeout(() => {
                     const targetRow = data.mode === 'comparison' ? 'statsRowComparison' : 'statsRowAnalysis';
                     document.getElementById(targetRow).scrollIntoView({ behavior: 'smooth', block: 'start' });

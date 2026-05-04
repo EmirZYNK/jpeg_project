@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-import os, sys, time
+import os, sys, time, io
 import numpy as np
 from PIL import Image
 
@@ -52,7 +52,7 @@ def compress_image():
     original_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(original_path)
     original_size = os.path.getsize(original_path)
-    target_size = original_size / factor
+    target_size_bytes = original_size / factor
 
     try:
         # 1. Görüntü Hazırlığı
@@ -81,17 +81,17 @@ def compress_image():
             )
             real_jpeg_psnrs.append(calculate_metrics(img_np, rec_j)[1])
 
-            j2k_tf = 1 if tf == 1 else tf * 2
+            j2k_graph_q = 0 if tf == 1 else tf
             rec_k = ycbcr_to_rgb(
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Y, j2k_tf), wavelet_type)[:Y.shape[0], :Y.shape[1]],
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cb, j2k_tf), wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cr, j2k_tf), wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
+                apply_idwt_2d(adaptive_quantize_dwt(dwt_Y, j2k_graph_q), wavelet_type)[:Y.shape[0], :Y.shape[1]],
+                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cb, j2k_graph_q), wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
+                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cr, j2k_graph_q), wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
             )
             real_j2k_psnrs.append(calculate_metrics(img_np, rec_k)[1])
 
         plot_url = generate_comparison_plot(test_bpps, real_jpeg_psnrs, real_j2k_psnrs)
 
-        # 3. YARDIMCI MOTOR FONKSİYONLARI
+        # 3. YARDIMCI MOTORLAR
         total_pixels = img_np.shape[0] * img_np.shape[1]
 
         def get_jpeg_result():
@@ -99,50 +99,59 @@ def compress_image():
             q_Y = blockwise_quantization(dct_Y, q_est, True, category)
             q_Cb = blockwise_quantization(dct_Cb, q_est, False, category)
             q_Cr = blockwise_quantization(dct_Cr, q_est, False, category)
-            
-            res_np = ycbcr_to_rgb(
+            return ycbcr_to_rgb(
                 blockwise_idct(blockwise_dequantization(q_Y, q_est, True, category)),
                 blockwise_idct(blockwise_dequantization(q_Cb, q_est, False, category)),
                 blockwise_idct(blockwise_dequantization(q_Cr, q_est, False, category))
             )
-            return res_np
 
-        def get_j2k_result():
-            j2k_f = 1 if factor == 1 else factor * 2
-            res_np = ycbcr_to_rgb(
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Y, j2k_f), wavelet_type)[:Y.shape[0], :Y.shape[1]],
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cb, j2k_f), wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cr, j2k_f), wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
-            )
-            return res_np
+        def get_j2k_result(target_byte_size):
+            q_step = 1.0 
+            best_np = None
+            for _ in range(15):
+                q_w_Y = adaptive_quantize_dwt(dwt_Y, q_step)
+                q_w_Cb = adaptive_quantize_dwt(dwt_Cb, q_step)
+                q_w_Cr = adaptive_quantize_dwt(dwt_Cr, q_step)
+                res_np = ycbcr_to_rgb(
+                    apply_idwt_2d(q_w_Y, wavelet_type)[:Y.shape[0], :Y.shape[1]],
+                    apply_idwt_2d(q_w_Cb, wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
+                    apply_idwt_2d(q_w_Cr, wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
+                )
+                temp_img = Image.fromarray(res_np)
+                temp_io = io.BytesIO()
+                temp_img.save(temp_io, format='JPEG', quality=95, optimize=True)
+                current_size = temp_io.tell()
+                best_np = res_np
+                if abs(current_size - target_byte_size) < (target_byte_size * 0.02): break
+                if current_size > target_byte_size: q_step *= 1.3
+                else: q_step *= 0.7
+            return best_np
 
-        def save_and_eval(np_img, prefix):
+        def save_and_eval(np_img, prefix, force_target_bytes=None):
             out_name = f"{prefix}_{int(time.time())}.jpg"
             out_path = os.path.join(OUTPUT_FOLDER, out_name)
             pil_img = Image.fromarray(np_img)
             
-            # Akıllı Boyut Kontrolü: Hedef KB değerini tutturana kadar JPEG kalitesini optimize et
+            t_bytes = force_target_bytes if force_target_bytes else target_size_bytes
             current_q = 95
             while True:
                 pil_img.save(out_path, format='JPEG', quality=current_q, optimize=True)
-                current_size = os.path.getsize(out_path)
-                if factor == 1 or current_size <= target_size or current_q <= 5:
-                    break
-                current_q -= 5 
+                c_size = os.path.getsize(out_path)
+                if factor == 1 or c_size <= t_bytes or current_q <= 5: break
+                current_q -= 2
 
-            mse, psnr, ssim = calculate_metrics(img_np, np_img)
-            # Gerçek BPP Hesabı: (Boyut_Byte * 8) / Toplam_Piksel
-            real_bpp = round((current_size * 8) / total_pixels, 3)
-            
-            return out_name, current_size, mse, psnr, ssim, real_bpp
+            # HATA BURADAYDI: pil_img'yi np.array() içine alarak gönderiyoruz
+            mse, psnr, ssim = calculate_metrics(img_np, np.array(pil_img)) 
+            real_bpp = round((os.path.getsize(out_path) * 8) / total_pixels, 3)
+            return out_name, os.path.getsize(out_path), mse, psnr, ssim, real_bpp
 
-        # 4. MODA GÖRE ÇIKTI ÜRETİMİ
+        # 4. MODA GÖRE ÇIKTI
         if mode == 'comparison':
             jpeg_np = get_jpeg_result()
-            j2k_np = get_j2k_result()
-            
             j_name, j_size, j_mse, j_psnr, j_ssim, j_bpp = save_and_eval(jpeg_np, "comp_jpeg")
-            k_name, k_size, k_mse, k_psnr, k_ssim, k_bpp = save_and_eval(j2k_np, "comp_j2k")
+            
+            j2k_np = get_j2k_result(j_size)
+            k_name, k_size, k_mse, k_psnr, k_ssim, k_bpp = save_and_eval(j2k_np, "comp_j2k", force_target_bytes=j_size)
             
             return jsonify({
                 'mode': 'comparison',
@@ -155,7 +164,7 @@ def compress_image():
             }), 200
 
         else: # Analysis Mode
-            final_np = get_jpeg_result() if algorithm == 'jpeg' else get_j2k_result()
+            final_np = get_jpeg_result() if algorithm == 'jpeg' else get_j2k_result(target_size_bytes)
             out_name, out_size, mse, psnr, ssim, res_bpp = save_and_eval(final_np, "single")
             
             return jsonify({
