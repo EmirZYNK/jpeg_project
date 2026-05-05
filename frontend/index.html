@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CompressLab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app">
+
+    <header class="topbar">
+        <div class="logo">
+            <span class="logo-icon">▧</span>
+            <span>CompressLab</span>
+        </div>
+
+        <nav class="top-tabs">
+            <button type="button" class="mode-tab active" data-mode="analysis">Compression</button>
+            <button type="button" class="mode-tab" data-mode="comparison">Comparison</button>
+        </nav>
+
+        <div class="project-tag">DSP Project</div>
+    </header>
+
+    <main class="layout">
+
+        <aside class="sidebar">
+
+            <div class="side-section">
+                <label>IMAGE</label>
+                <div class="upload-box">
+                    <input type="file" id="imageInput" accept="image/*">
+                    <div class="upload-content">
+                        <div class="upload-icon">⇪</div>
+                        <p>Drop or select image</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-section">
+                <label>IMAGE TYPE</label>
+                <select id="imageTypeSelect">
+                    <option value="natural">Natural Image</option>
+                    <option value="synthetic">Synthetic Image</option>
+                    <option value="hybrid">Hybrid Image</option>
+                    <option value="biomedical">Biomedical / Fingerprint</option>
+                </select>
+            </div>
+
+            <select id="modeSelect" class="hidden-select">
+                <option value="analysis">Analysis Mode</option>
+                <option value="comparison">Comparison Mode</option>
+            </select>
+
+            <div class="side-section" id="algorithmContainer">
+                <label>ALGORITHM</label>
+                <div class="algorithm-toggle">
+                    <button type="button" class="algo-btn active" data-algorithm="jpeg">JPEG</button>
+                    <button type="button" class="algo-btn" data-algorithm="jpeg2000">JPEG2000</button>
+                </div>
+
+                <select id="algorithmSelect" class="hidden-select">
+                    <option value="jpeg">JPEG</option>
+                    <option value="jpeg2000">JPEG2000</option>
+                </select>
+            </div>
+
+            <div id="jpegParams" class="param-card">
+                <h3>JPEG Parameters</h3>
+                <label>Quality</label>
+                <div class="slider-row">
+                    <input type="range" id="qualitySlider" min="1" max="100" value="50">
+                    <span id="qualityValue">50</span>
+                </div>
+            </div>
+
+            <div id="jpeg2000Params" class="param-card">
+                <h3>JPEG2000 Parameters</h3>
+
+                <label>Wavelet Filter</label>
+                <select id="waveletSelect">
+                    <option value="haar">Haar</option>
+                    <option value="db1">Daubechies db1</option>
+                    <option value="db2">Daubechies db2</option>
+                    <option value="bior4.4">Biorthogonal bior4.4</option>
+                    <option value="sym2">Symlet sym2</option>
+                </select>
+
+                <label>DWT Level</label>
+                <input type="number" id="levelInput" min="1" max="5" value="2">
+
+                <label>Compression Factor</label>
+                <div class="slider-row">
+                    <input type="range" id="factorSlider" min="1" max="50" value="10">
+                    <span id="factorValue">10</span>
+                </div>
+            </div>
+
+            <button id="compressBtn">Run Test →</button>
+        </aside>
+
+        <section class="workspace">
+
+            <section class="hero-card">
+                <div class="compare-slider" id="compareSlider">
+                    <img id="originalPreview" class="slider-img original-img" src="">
+                    <div class="after-layer" id="afterLayer">
+                        <img id="compressedPreview" class="slider-img compressed-img" src="">
+                    </div>
+
+                    <div class="compare-label-row">
+                        <div class="image-label original-label">Original</div>
+                        <div class="image-label compressed-label" id="compressedTitle">Compressed</div>
+                    </div>
+
+                    <input type="range" id="imageCompareRange" min="0" max="100" value="50">
+                    <div class="slider-line" id="sliderLine">
+                        <span>↔</span>
+                    </div>
+                </div>
+
+                <div class="compare-slider" id="jpeg2000Box" style="display:none;">
+                    <img id="originalPreview2" class="slider-img original-img" src="">
+
+                    <div class="after-layer" id="afterLayer2">
+                        <img id="jpeg2000Preview" class="slider-img compressed-img" src="">
+                    </div>
+
+                    <div class="compare-label-row">
+                        <div class="image-label original-label">Original</div>
+                        <div class="image-label jpeg2000-label">JPEG2000</div>
+                    </div>
+
+                    <input type="range" id="imageCompareRange2" min="0" max="100" value="50">
+
+                    <div class="slider-line" id="sliderLine2">
+                        <span>↔</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="metrics-panel">
+                <div class="metric-card orange">
+                    <span>MSE</span>
+                    <strong id="mseCard">-</strong>
+                    <small>Mean Squared Error</small>
+                </div>
+
+                <div class="metric-card green">
+                    <span>PSNR</span>
+                    <strong id="psnrCard">-</strong>
+                    <small>Peak Signal-to-Noise Ratio</small>
+                </div>
+
+                <div class="metric-card purple">
+                    <span>SSIM</span>
+                    <strong id="ssimCard">-</strong>
+                    <small>Structural Similarity Index</small>
+                </div>
+
+                <div class="metric-card blue">
+                    <span>Ratio</span>
+                    <strong id="ratioCard">-</strong>
+                    <small>Compression Ratio</small>
+                </div>
+            </section>
+
+            <section class="plot-box" id="errorMapContainer" style="display:none;">
+    <h2>Error Maps</h2>
+
+    <div class="error-map-row">
+        <div class="error-map-item">
+            <h3 id="errorMapTitle">Error Map</h3>
+            <img id="errorMapPreview" src="">
+        </div>
+
+        <div class="error-map-item" id="errorMapItem2" style="display:none;">
+            <h3 id="errorMapTitle2">JPEG2000 Error Map</h3>
+            <img id="errorMapPreview2" src="">
+        </div>
+    </div>
+</section>
+
+            <section class="result-card">
+                <h2>Numerical Results</h2>
+                <div id="resultText" class="result-grid"></div>
+            </section>
+
+            <section class="plot-box" id="plotBox">
+                <h2 id="plotTitle">Compression Analysis Graph</h2>
+                <img id="plotPreview" src="">
+            </section>
+
+        </section>
+    </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

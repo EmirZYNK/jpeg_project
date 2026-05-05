@@ -17,3 +17,6 @@ Thumbs.db
 # IDE ayarları
 .vscode/
 .idea/
+/backend/data/outputs
+/backend/data/plots
+/backend/data/uploads
