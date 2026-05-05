@@ -79,7 +79,6 @@ hiddenFileInput.addEventListener('change', (e) => {
         document.getElementById('statsRowAnalysis').style.display = 'none';
         document.getElementById('statsRowComparison').style.display = 'none';
         document.getElementById('graphRow').style.display = 'none';
-        document.getElementById('dwtLayersRow').style.display = 'none'; // EKLENDİ
         
         const sizeKB = (file.size / 1024).toFixed(2);
         document.getElementById('origSize').innerText = sizeKB;
@@ -167,17 +166,6 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('psnrVal').innerText = data.psnr;
                 document.getElementById('ssimVal').innerText = data.ssim;
                 document.getElementById('mseVal').innerText = data.mse;
-
-                // --- YENİ: DWT KATMANLARINI GÖSTER ---
-                if (data.algorithm === 'jpeg2000' && data.dwt_urls) {
-                    document.getElementById('dwtLayersRow').style.display = 'block';
-                    document.getElementById('dwtLL').src = data.dwt_urls.LL;
-                    document.getElementById('dwtLH').src = data.dwt_urls.LH;
-                    document.getElementById('dwtHL').src = data.dwt_urls.HL;
-                    document.getElementById('dwtHH').src = data.dwt_urls.HH;
-                } else {
-                    document.getElementById('dwtLayersRow').style.display = 'none';
-                }
             }
 
             if (data.plot_url) {
