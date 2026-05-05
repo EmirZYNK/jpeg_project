@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 import os, sys, time, io
 import numpy as np
 from PIL import Image
+import pywt  # YENİ EKLENDİ
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
@@ -140,7 +141,6 @@ def compress_image():
                 if factor == 1 or c_size <= t_bytes or current_q <= 5: break
                 current_q -= 2
 
-            # HATA BURADAYDI: pil_img'yi np.array() içine alarak gönderiyoruz
             mse, psnr, ssim = calculate_metrics(img_np, np.array(pil_img)) 
             real_bpp = round((os.path.getsize(out_path) * 8) / total_pixels, 3)
             return out_name, os.path.getsize(out_path), mse, psnr, ssim, real_bpp
@@ -167,7 +167,7 @@ def compress_image():
             final_np = get_jpeg_result() if algorithm == 'jpeg' else get_j2k_result(target_size_bytes)
             out_name, out_size, mse, psnr, ssim, res_bpp = save_and_eval(final_np, "single")
             
-            return jsonify({
+            response_data = {
                 'mode': 'analysis',
                 'compressed_url': f'/outputs/{out_name}?t={int(time.time())}',
                 'original_size_kb': round(original_size / 1024, 2),
@@ -176,7 +176,35 @@ def compress_image():
                 'compression_ratio': round(original_size / out_size, 2),
                 'bpp': res_bpp, 'mse': mse, 'psnr': psnr, 'ssim': ssim,
                 'plot_url': 'data:image/png;base64,' + plot_url
-            }), 200
+            }
+
+            # EĞER JPEG 2000 SEÇİLDİYSE KATMANLARI ÇIKART
+            if algorithm == 'jpeg2000':
+                coeffs_1 = pywt.wavedec2(Y, wavelet_type, level=1)
+                LL, (LH, HL, HH) = coeffs_1
+                
+                def save_layer(arr, name, is_ll=False):
+                    if is_ll:
+                        arr_min, arr_max = arr.min(), arr.max()
+                        norm = (arr - arr_min) / (arr_max - arr_min) * 255 if arr_max > arr_min else arr
+                        img_np = np.clip(norm, 0, 255).astype(np.uint8)
+                    else:
+                        amp = np.clip(np.abs(arr) * 4.0, 0, 255) 
+                        img_np = amp.astype(np.uint8)
+                        
+                    out_name = f"dwt_layer_{name}_{int(time.time())}.png"
+                    out_path = os.path.join(OUTPUT_FOLDER, out_name)
+                    Image.fromarray(img_np).save(out_path)
+                    return f'/outputs/{out_name}?t={int(time.time())}'
+
+                response_data['dwt_urls'] = {
+                    'LL': save_layer(LL, 'LL', True),
+                    'LH': save_layer(LH, 'LH', False),
+                    'HL': save_layer(HL, 'HL', False),
+                    'HH': save_layer(HH, 'HH', False)
+                }
+
+            return jsonify(response_data), 200
 
     except Exception as e:
         import traceback
