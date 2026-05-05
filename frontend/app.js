@@ -31,17 +31,19 @@ modeRadios.forEach(radio => {
         if (mode === 'comparison') {
             algoControlGroup.style.display = 'none';
             jpeg2000Params.style.display = 'flex'; 
+            // KARŞILAŞTIRMA MODU ETİKETLERİ
             leftLabel.innerText = 'JPEG (DCT)';
             rightLabel.innerText = 'JPEG 2000 (DWT)';
-            leftLabel.style.color = '#a6e3a1';
-            rightLabel.style.color = '#89b4fa';
+            leftLabel.style.color = '#a6e3a1'; // Yeşil
+            rightLabel.style.color = '#89b4fa'; // Mavi
         } else {
             algoControlGroup.style.display = 'flex';
             jpeg2000Params.style.display = algorithmSelect.value === 'jpeg2000' ? 'flex' : 'none';
+            // ANALİZ MODU ETİKETLERİ
             leftLabel.innerText = 'İşlenmiş Resim';
             rightLabel.innerText = 'Orijinal Resim';
-            leftLabel.style.color = '#a6e3a1';
-            rightLabel.style.color = '#cdd6f4';
+            leftLabel.style.color = '#a6e3a1'; // Varsayılan yeşil
+            rightLabel.style.color = '#cdd6f4'; // Orijinal için beyaz/gri tonu
         }
     });
 });
@@ -77,7 +79,7 @@ hiddenFileInput.addEventListener('change', (e) => {
         document.getElementById('statsRowAnalysis').style.display = 'none';
         document.getElementById('statsRowComparison').style.display = 'none';
         document.getElementById('graphRow').style.display = 'none';
-        document.getElementById('dwtLayersRow').style.display = 'none';
+        document.getElementById('dwtLayersRow').style.display = 'none'; // EKLENDİ
         
         const sizeKB = (file.size / 1024).toFixed(2);
         document.getElementById('origSize').innerText = sizeKB;
@@ -102,6 +104,7 @@ compressBtn.addEventListener('click', async () => {
     if (!file) { alert("Lütfen önce bir resim seçin!"); return; }
 
     const currentMode = document.querySelector('input[name="appMode"]:checked').value;
+    
     const formData = new FormData();
     formData.append('image', file);
     formData.append('mode', currentMode);
@@ -126,6 +129,7 @@ compressBtn.addEventListener('click', async () => {
             sliderLine.style.left = '50%';
 
             if (data.mode === 'comparison') {
+                // KARŞILAŞTIRMA MODU: SOL = JPEG, SAĞ = J2K
                 compressedImage.src = data.jpeg_url; 
                 compressedImage.style.display = 'block';
                 originalImage.src = data.j2k_url;    
@@ -133,12 +137,14 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('statsRowAnalysis').style.display = 'none';
                 document.getElementById('statsRowComparison').style.display = 'grid';
 
+                // JPEG İstatistikleri
                 document.getElementById('jSize').innerText = data.jpeg_stats.size;
                 document.getElementById('jBpp').innerText = data.jpeg_stats.bpp;
                 document.getElementById('jPsnr').innerText = data.jpeg_stats.psnr;
                 document.getElementById('jSsim').innerText = data.jpeg_stats.ssim;
                 document.getElementById('jMse').innerText = data.jpeg_stats.mse;
 
+                // J2K İstatistikleri
                 document.getElementById('kSize').innerText = data.j2k_stats.size;
                 document.getElementById('kBpp').innerText = data.j2k_stats.bpp;
                 document.getElementById('kPsnr').innerText = data.j2k_stats.psnr;
@@ -146,6 +152,7 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('kMse').innerText = data.j2k_stats.mse;
 
             } else {
+                // ANALİZ MODU: SOL = İŞLENMİŞ, SAĞ = ORİJİNAL
                 compressedImage.src = data.compressed_url;
                 compressedImage.style.display = 'block';
                 originalImage.src = URL.createObjectURL(file);
@@ -161,20 +168,13 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('ssimVal').innerText = data.ssim;
                 document.getElementById('mseVal').innerText = data.mse;
 
-                // --- DWT KATMANLARINI VE PİRAMİDİ GÖSTER ---
+                // --- YENİ: DWT KATMANLARINI GÖSTER ---
                 if (data.algorithm === 'jpeg2000' && data.dwt_urls) {
                     document.getElementById('dwtLayersRow').style.display = 'block';
-                    
-                    // 1. Kısım: 4'lü Kutu
                     document.getElementById('dwtLL').src = data.dwt_urls.LL;
                     document.getElementById('dwtLH').src = data.dwt_urls.LH;
                     document.getElementById('dwtHL').src = data.dwt_urls.HL;
                     document.getElementById('dwtHH').src = data.dwt_urls.HH;
-                    
-                    // 2. Kısım: Piramit
-                    const selectedLevel = document.getElementById('levelInput').value;
-                    document.getElementById('pyramidTitle').innerText = `Seviye ${selectedLevel} Tüm Katmanlar (DWT Matris Piramidi)`;
-                    document.getElementById('dwtPyramid').src = data.dwt_urls.pyramid;
                 } else {
                     document.getElementById('dwtLayersRow').style.display = 'none';
                 }
@@ -188,6 +188,7 @@ compressBtn.addEventListener('click', async () => {
                     document.getElementById(targetRow).scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 400);
             }
+
         } else {
             alert("Sunucu Hatası: " + data.error);
         }
