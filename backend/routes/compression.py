@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import os, sys, time, io
 import numpy as np
 from PIL import Image
-import pywt  # YENİ EKLENDİ
+import pywt  
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
@@ -15,10 +15,6 @@ from dsp.jpeg2000.quantization import adaptive_quantize_dwt
 from dsp.decoder.inverse_dwt import apply_idwt_2d
 from dsp.evaluation.metrics import calculate_metrics
 from dsp.evaluation.graphs import generate_comparison_plot
-
-from dsp.jpeg.zigzag import block_to_zigzag
-from dsp.jpeg.lossless import encode_block
-from dsp.jpeg.huffman import huffman_encode
 
 compression_bp = Blueprint('compression', __name__)
 UPLOAD_FOLDER = '../data/uploads'
@@ -56,7 +52,6 @@ def compress_image():
     target_size_bytes = original_size / factor
 
     try:
-        # 1. Görüntü Hazırlığı
         img = Image.open(original_path).convert('RGB')
         w, h = img.size
         img = img.crop((0, 0, (w//8)*8, (h//8)*8))
@@ -68,7 +63,6 @@ def compress_image():
         dwt_Cb = apply_dwt_2d(Cb, wavelet_type, decomposition_level)
         dwt_Cr = apply_dwt_2d(Cr, wavelet_type, decomposition_level)
 
-        # 2. RD CURVE VERİSİ
         test_factors = [20, 15, 10, 5, 1] 
         test_bpps = [round(24 / tf, 2) for tf in test_factors] 
         real_jpeg_psnrs, real_j2k_psnrs = [], []
@@ -92,7 +86,6 @@ def compress_image():
 
         plot_url = generate_comparison_plot(test_bpps, real_jpeg_psnrs, real_j2k_psnrs)
 
-        # 3. YARDIMCI MOTORLAR
         total_pixels = img_np.shape[0] * img_np.shape[1]
 
         def get_jpeg_result():
@@ -132,7 +125,6 @@ def compress_image():
             out_name = f"{prefix}_{int(time.time())}.jpg"
             out_path = os.path.join(OUTPUT_FOLDER, out_name)
             pil_img = Image.fromarray(np_img)
-            
             t_bytes = force_target_bytes if force_target_bytes else target_size_bytes
             current_q = 95
             while True:
@@ -140,49 +132,35 @@ def compress_image():
                 c_size = os.path.getsize(out_path)
                 if factor == 1 or c_size <= t_bytes or current_q <= 5: break
                 current_q -= 2
-
             mse, psnr, ssim = calculate_metrics(img_np, np.array(pil_img)) 
             real_bpp = round((os.path.getsize(out_path) * 8) / total_pixels, 3)
             return out_name, os.path.getsize(out_path), mse, psnr, ssim, real_bpp
 
-        # 4. MODA GÖRE ÇIKTI
         if mode == 'comparison':
             jpeg_np = get_jpeg_result()
             j_name, j_size, j_mse, j_psnr, j_ssim, j_bpp = save_and_eval(jpeg_np, "comp_jpeg")
-            
             j2k_np = get_j2k_result(j_size)
             k_name, k_size, k_mse, k_psnr, k_ssim, k_bpp = save_and_eval(j2k_np, "comp_j2k", force_target_bytes=j_size)
-            
             return jsonify({
-                'mode': 'comparison',
-                'jpeg_url': f'/outputs/{j_name}?t={int(time.time())}',
-                'j2k_url': f'/outputs/{k_name}?t={int(time.time())}',
+                'mode': 'comparison', 'jpeg_url': f'/outputs/{j_name}?t={int(time.time())}', 'j2k_url': f'/outputs/{k_name}?t={int(time.time())}',
                 'jpeg_stats': {'size': round(j_size/1024, 2), 'bpp': j_bpp, 'psnr': j_psnr, 'ssim': j_ssim, 'mse': j_mse},
                 'j2k_stats': {'size': round(k_size/1024, 2), 'bpp': k_bpp, 'psnr': k_psnr, 'ssim': k_ssim, 'mse': k_mse},
-                'original_size_kb': round(original_size / 1024, 2),
-                'plot_url': 'data:image/png;base64,' + plot_url
+                'original_size_kb': round(original_size / 1024, 2), 'plot_url': 'data:image/png;base64,' + plot_url
             }), 200
 
-        else: # Analysis Mode
+        else: 
             final_np = get_jpeg_result() if algorithm == 'jpeg' else get_j2k_result(target_size_bytes)
             out_name, out_size, mse, psnr, ssim, res_bpp = save_and_eval(final_np, "single")
-            
             response_data = {
-                'mode': 'analysis',
-                'compressed_url': f'/outputs/{out_name}?t={int(time.time())}',
-                'original_size_kb': round(original_size / 1024, 2),
-                'compressed_size_kb': round(out_size / 1024, 2),
-                'algorithm': algorithm,
-                'compression_ratio': round(original_size / out_size, 2),
-                'bpp': res_bpp, 'mse': mse, 'psnr': psnr, 'ssim': ssim,
-                'plot_url': 'data:image/png;base64,' + plot_url
+                'mode': 'analysis', 'compressed_url': f'/outputs/{out_name}?t={int(time.time())}',
+                'original_size_kb': round(original_size / 1024, 2), 'compressed_size_kb': round(out_size / 1024, 2),
+                'algorithm': algorithm, 'compression_ratio': round(original_size / out_size, 2),
+                'bpp': res_bpp, 'mse': mse, 'psnr': psnr, 'ssim': ssim, 'plot_url': 'data:image/png;base64,' + plot_url
             }
 
-            # EĞER JPEG 2000 SEÇİLDİYSE KATMANLARI ÇIKART
             if algorithm == 'jpeg2000':
                 coeffs_1 = pywt.wavedec2(Y, wavelet_type, level=1)
                 LL, (LH, HL, HH) = coeffs_1
-                
                 def save_layer(arr, name, is_ll=False):
                     if is_ll:
                         arr_min, arr_max = arr.min(), arr.max()
@@ -191,22 +169,30 @@ def compress_image():
                     else:
                         amp = np.clip(np.abs(arr) * 4.0, 0, 255) 
                         img_np = amp.astype(np.uint8)
-                        
                     out_name = f"dwt_layer_{name}_{int(time.time())}.png"
                     out_path = os.path.join(OUTPUT_FOLDER, out_name)
                     Image.fromarray(img_np).save(out_path)
                     return f'/outputs/{out_name}?t={int(time.time())}'
 
+                coeffs_N = pywt.wavedec2(Y, wavelet_type, level=decomposition_level)
+                enhanced_coeffs = []
+                LL_N = coeffs_N[0]
+                LL_min, LL_max = LL_N.min(), LL_N.max()
+                LL_norm = (LL_N - LL_min) / (LL_max - LL_min) * 255 if LL_max > LL_min else LL_N
+                enhanced_coeffs.append(LL_norm)
+                for i in range(1, len(coeffs_N)):
+                    c_LH, c_HL, c_HH = coeffs_N[i]
+                    enhanced_coeffs.append((np.clip(np.abs(c_LH) * 4.0, 0, 255), np.clip(np.abs(c_HL) * 4.0, 0, 255), np.clip(np.abs(c_HH) * 4.0, 0, 255)))
+                pyramid_arr, _ = pywt.coeffs_to_array(enhanced_coeffs)
+                pyramid_name = f"dwt_pyramid_{int(time.time())}.png"
+                Image.fromarray(pyramid_arr.astype(np.uint8)).save(os.path.join(OUTPUT_FOLDER, pyramid_name))
+
                 response_data['dwt_urls'] = {
-                    'LL': save_layer(LL, 'LL', True),
-                    'LH': save_layer(LH, 'LH', False),
-                    'HL': save_layer(HL, 'HL', False),
-                    'HH': save_layer(HH, 'HH', False)
+                    'LL': save_layer(LL, 'LL', True), 'LH': save_layer(LH, 'LH', False),
+                    'HL': save_layer(HL, 'HL', False), 'HH': save_layer(HH, 'HH', False),
+                    'pyramid': f'/outputs/{pyramid_name}?t={int(time.time())}'
                 }
-
             return jsonify(response_data), 200
-
     except Exception as e:
-        import traceback
-        traceback.print_exc() 
+        import traceback; traceback.print_exc() 
         return jsonify({'error': str(e)}), 500
