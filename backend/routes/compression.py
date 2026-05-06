@@ -140,10 +140,15 @@ def compress_image():
                 if factor == 1 or c_size <= t_bytes or current_q <= 5: break
                 current_q -= 2
 
-            # HATA BURADAYDI: pil_img'yi np.array() içine alarak gönderiyoruz
-            mse, psnr, ssim = calculate_metrics(img_np, np.array(pil_img)) 
-            real_bpp = round((os.path.getsize(out_path) * 8) / total_pixels, 3)
-            return out_name, os.path.getsize(out_path), mse, psnr, ssim, real_bpp
+            # DÜZELTİLEN KISIM:
+            # Ekranda gördüğümüz bozulmuş resim ile metriklerin (PSNR, MSE) eşleşmesi için,
+            # RAM'deki bozulmamış resmi değil, diskteki son dosyayı geri okuyup hesaplıyoruz.
+            saved_compressed_img = Image.open(out_path)
+            final_np_array = np.array(saved_compressed_img)
+            
+            mse, psnr, ssim = calculate_metrics(img_np, final_np_array) 
+            real_bpp = round((c_size * 8) / total_pixels, 3)
+            return out_name, c_size, mse, psnr, ssim, real_bpp
 
         # 4. MODA GÖRE ÇIKTI
         if mode == 'comparison':
