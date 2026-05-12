@@ -234,7 +234,7 @@ function renderComparisonResults(data) {
                 <div class="result-row"><span>DWT Level</span><span>${data.jpeg2000.level}</span></div>
                 <div class="result-row"><span>Factor</span><span>${data.jpeg2000.factor}</span></div>
                 <div class="result-row"><span>Original Size</span><span>${data.jpeg2000.original_size_kb} KB</span></div>
-                <div class="result-row"><span>Simulated Compressed Size</span><span>${data.jpeg2000.compressed_size_kb} KB</span></div>
+                <div class="result-row"><span>Entropy Bitstream Size</span><span>${data.jpeg2000.compressed_size_kb} KB</span></div>
                 <div class="result-row"><span>Compression Ratio</span><span>${data.jpeg2000.compression_ratio}x</span></div>
                 <div class="result-row"><span>BPP</span><span>${data.jpeg2000.bpp}</span></div>
                 <div class="result-row"><span>MSE</span><span>${data.jpeg2000.mse}</span></div>
@@ -244,7 +244,7 @@ function renderComparisonResults(data) {
         </div>
 
         <div class="note-box">
-            JPEG size is calculated from the generated JPG file. JPEG2000 size is estimated from transform coefficients because this system does not generate a JP2 codestream.
+            JPEG size is calculated from the generated JPG file. JPEG2000 size is calculated from zlib-compressed wavelet coefficient bitstream.
         </div>
     `;
 }
@@ -281,7 +281,7 @@ function renderAnalysisResults(data) {
             <div class="result-box">
                 <h3>Compression Results</h3>
                 <div class="result-row"><span>Original Size</span><span>${data.original_size_kb} KB</span></div>
-                <div class="result-row"><span>Compressed / Estimated Size</span><span>${data.compressed_size_kb} KB</span></div>
+                <div class="result-row"><span><span>Compressed Bitstream Size</span></span><span>${data.compressed_size_kb} KB</span></div>
                 <div class="result-row"><span>Output Size</span><span>${data.output_file_size_kb || "N/A"} KB</span></div>
                 <div class="result-row"><span>Compression Ratio</span><span>${data.compression_ratio}x</span></div>
                 <div class="result-row"><span>BPP</span><span>${data.bpp}</span></div>
@@ -292,7 +292,7 @@ function renderAnalysisResults(data) {
         </div>
 
         <div class="note-box">
-            JPEG output is saved as a JPG file. JPEG2000 output is a reconstructed PNG image, and its compressed size is estimated from transform coefficients.
+            JPEG size is calculated from the generated JPG file. JPEG2000 size is calculated from zlib-compressed wavelet coefficient bitstream.
         </div>
     `;
 }

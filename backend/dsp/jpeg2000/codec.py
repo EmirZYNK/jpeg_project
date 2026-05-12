@@ -1,5 +1,9 @@
 import numpy as np
 
+from dsp.jpeg2000.entropy import (
+    encode_coefficients_to_bitstream,
+    decode_coefficients_from_bitstream
+)
 from dsp.jpeg2000.dwt import apply_dwt_2d, apply_idwt_2d
 from dsp.jpeg2000.quantization import (
     quantize_coeffs,
@@ -18,19 +22,6 @@ def to_uint8(image):
     return np.clip(np.round(image), 0, 255).astype(np.uint8)
 
 
-def estimate_jpeg2000_size(nonzero_count, total_pixels, factor):
-    factor = max(1, int(factor))
-
-    entropy_factor = 0.28
-    compression_factor = 10 / factor
-
-    estimated = nonzero_count * entropy_factor * compression_factor
-
-    min_size = total_pixels * 0.03
-
-    return int(max(1, min(estimated, total_pixels, max(estimated, min_size))))
-
-
 def encode_decode_jpeg2000_gray(image_gray, factor=10, wavelet="haar", level=2):
     factor = max(1, int(factor))
     level = max(1, int(level))
@@ -42,7 +33,20 @@ def encode_decode_jpeg2000_gray(image_gray, factor=10, wavelet="haar", level=2):
     )
 
     quantized = quantize_coeffs(coeffs, factor=factor)
-    dequantized = dequantize_coeffs(quantized, factor=factor)
+
+    bitstream = encode_coefficients_to_bitstream(
+        quantized,
+        lossless=False
+    )
+
+    bitstream_size_bytes = len(bitstream)
+
+    decoded_quantized = decode_coefficients_from_bitstream(bitstream)
+
+    dequantized = dequantize_coeffs(
+        decoded_quantized,
+        factor=factor
+    )
 
     reconstructed = apply_idwt_2d(
         dequantized,
@@ -52,18 +56,12 @@ def encode_decode_jpeg2000_gray(image_gray, factor=10, wavelet="haar", level=2):
 
     reconstructed = to_uint8(reconstructed)
 
-    nonzero_count = count_nonzero_coeffs(quantized)
-    total_pixels = image_gray.shape[0] * image_gray.shape[1]
-
-    estimated_size_bytes = estimate_jpeg2000_size(
-        nonzero_count,
-        total_pixels,
-        factor
-    )
+    nonzero_count = count_nonzero_coeffs(decoded_quantized)
 
     return {
         "reconstructed": reconstructed,
-        "estimated_size_bytes": estimated_size_bytes,
+        "bitstream_size_bytes": bitstream_size_bytes,
+        "estimated_size_bytes": bitstream_size_bytes,
         "nonzero_coeffs": nonzero_count,
         "wavelet": wavelet,
         "level": level,
@@ -72,6 +70,9 @@ def encode_decode_jpeg2000_gray(image_gray, factor=10, wavelet="haar", level=2):
 
 
 def encode_decode_jpeg2000_color(image_bgr, factor=10, wavelet="haar", level=2):
+    factor = max(1, int(factor))
+    level = max(1, int(level))
+
     ycrcb = bgr_to_ycrcb(image_bgr)
     y, cr, cb = split_channels(ycrcb)
 
@@ -103,21 +104,25 @@ def encode_decode_jpeg2000_color(image_bgr, factor=10, wavelet="haar", level=2):
     )
 
     reconstructed_bgr = ycrcb_to_bgr(merged_ycrcb)
+    reconstructed_bgr = to_uint8(reconstructed_bgr)
 
-    estimated_size_bytes = (
-        y_result["estimated_size_bytes"]
-        + cr_result["estimated_size_bytes"]
-        + cb_result["estimated_size_bytes"]
+    bitstream_size_bytes = (
+        y_result["bitstream_size_bytes"]
+        + cr_result["bitstream_size_bytes"]
+        + cb_result["bitstream_size_bytes"]
+    )
+
+    nonzero_coeffs = (
+        y_result["nonzero_coeffs"]
+        + cr_result["nonzero_coeffs"]
+        + cb_result["nonzero_coeffs"]
     )
 
     return {
-        "reconstructed": to_uint8(reconstructed_bgr),
-        "estimated_size_bytes": estimated_size_bytes,
-        "nonzero_coeffs": (
-            y_result["nonzero_coeffs"]
-            + cr_result["nonzero_coeffs"]
-            + cb_result["nonzero_coeffs"]
-        ),
+        "reconstructed": reconstructed_bgr,
+        "bitstream_size_bytes": bitstream_size_bytes,
+        "estimated_size_bytes": bitstream_size_bytes,
+        "nonzero_coeffs": nonzero_coeffs,
         "wavelet": wavelet,
         "level": level,
         "factor": factor
@@ -133,19 +138,29 @@ def encode_decode_jpeg2000_lossless_gray(image_gray, wavelet="haar", level=2):
         level=level
     )
 
-    reconstructed = apply_idwt_2d(
+    bitstream = encode_coefficients_to_bitstream(
         coeffs,
+        lossless=True
+    )
+
+    bitstream_size_bytes = len(bitstream)
+
+    decoded_coeffs = decode_coefficients_from_bitstream(bitstream)
+
+    reconstructed = apply_idwt_2d(
+        decoded_coeffs,
         wavelet=wavelet,
         original_shape=image_gray.shape
     )
 
     reconstructed = to_uint8(reconstructed)
 
-    nonzero_count = count_nonzero_coeffs(coeffs)
+    nonzero_count = count_nonzero_coeffs(decoded_coeffs)
 
     return {
         "reconstructed": reconstructed,
-        "estimated_size_bytes": image_gray.nbytes,
+        "bitstream_size_bytes": bitstream_size_bytes,
+        "estimated_size_bytes": bitstream_size_bytes,
         "nonzero_coeffs": nonzero_count,
         "wavelet": wavelet,
         "level": level,
@@ -154,6 +169,8 @@ def encode_decode_jpeg2000_lossless_gray(image_gray, wavelet="haar", level=2):
 
 
 def encode_decode_jpeg2000_lossless_color(image_bgr, wavelet="haar", level=2):
+    level = max(1, int(level))
+
     ycrcb = bgr_to_ycrcb(image_bgr)
     y, cr, cb = split_channels(ycrcb)
 
@@ -182,15 +199,25 @@ def encode_decode_jpeg2000_lossless_color(image_bgr, wavelet="haar", level=2):
     )
 
     reconstructed_bgr = ycrcb_to_bgr(merged_ycrcb)
+    reconstructed_bgr = to_uint8(reconstructed_bgr)
+
+    bitstream_size_bytes = (
+        y_result["bitstream_size_bytes"]
+        + cr_result["bitstream_size_bytes"]
+        + cb_result["bitstream_size_bytes"]
+    )
+
+    nonzero_coeffs = (
+        y_result["nonzero_coeffs"]
+        + cr_result["nonzero_coeffs"]
+        + cb_result["nonzero_coeffs"]
+    )
 
     return {
-        "reconstructed": to_uint8(reconstructed_bgr),
-        "estimated_size_bytes": image_bgr.nbytes,
-        "nonzero_coeffs": (
-            y_result["nonzero_coeffs"]
-            + cr_result["nonzero_coeffs"]
-            + cb_result["nonzero_coeffs"]
-        ),
+        "reconstructed": reconstructed_bgr,
+        "bitstream_size_bytes": bitstream_size_bytes,
+        "estimated_size_bytes": bitstream_size_bytes,
+        "nonzero_coeffs": nonzero_coeffs,
         "wavelet": wavelet,
         "level": level,
         "factor": "lossless"

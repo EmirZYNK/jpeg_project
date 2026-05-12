@@ -384,12 +384,15 @@ def compress_image():
 
     mse, psnr, ssim = calculate_metrics(original_gray, reconstructed_gray)
 
-    compressed_size_bytes = os.path.getsize(output_path)
+    if algorithm == "jpeg2000":
+        compressed_size_bytes = result["bitstream_size_bytes"]
+    else:
+        compressed_size_bytes = os.path.getsize(output_path)
 
     if algorithm == "jpeg":
         size_type = "jpeg_output_file_size"
     else:
-        size_type = "jpeg2000_output_file_size"
+        size_type = "jpeg2000_huffman_bitstream_size"
 
     size_info = get_size_info(
         original_size_bytes,
@@ -535,7 +538,7 @@ def compare_images():
         jpeg2000_gray
     )
 
-    jpeg2000_size_bytes = os.path.getsize(jpeg2000_output_path)
+    jpeg2000_size_bytes = jpeg2000_result["bitstream_size_bytes"]
     jpeg2000_size_kb = round(jpeg2000_size_bytes / 1024, 2)
     jpeg2000_output_size_kb = round(os.path.getsize(jpeg2000_output_path) / 1024, 2)
     jpeg2000_ratio = round(original_size_bytes / max(jpeg2000_size_bytes, 1), 2)
@@ -592,6 +595,6 @@ def compare_images():
             "compressed_url": f"/outputs/{jpeg2000_preview_filename}",
             "download_url": f"/outputs/{jpeg2000_output_filename}",
             "error_url": f"/plots/{jpeg2000_error_filename}",
-            "size_type": "jpeg2000_output_file_size"
+            "size_type": "jpeg2000_huffman_bitstream_size"
         }
     })
