@@ -13,7 +13,7 @@ from dsp.jpeg2000.dwt import apply_dwt_2d
 from dsp.jpeg2000.quantization import adaptive_quantize_dwt 
 from dsp.decoder.inverse_dwt import apply_idwt_2d
 from dsp.evaluation.metrics import calculate_metrics
-from dsp.evaluation.graphs import generate_comparison_plot
+from dsp.evaluation.graphs import generate_histogram # GRAFİK YERİNE HİSTOGRAM
 
 from dsp.jpeg.zigzag import block_to_zigzag
 from dsp.jpeg.lossless import encode_block
@@ -67,31 +67,9 @@ def compress_image():
         dwt_Cb = apply_dwt_2d(Cb, wavelet_type, decomposition_level)
         dwt_Cr = apply_dwt_2d(Cr, wavelet_type, decomposition_level)
 
-        # 2. RD CURVE VERİSİ
-        test_factors = [20, 15, 10, 5, 1] 
-        test_bpps = [round(24 / tf, 2) for tf in test_factors] 
-        real_jpeg_psnrs, real_j2k_psnrs = [], []
+        # ESKİ AĞIR RD CURVE DÖNGÜSÜ BURADAN KALDIRILDI - SİSTEM ARTIK ÇOK DAHA HIZLI
 
-        for tf in test_factors:
-            q_est = max(1, int(95 / tf))
-            rec_j = ycbcr_to_rgb(
-                blockwise_idct(blockwise_dequantization(blockwise_quantization(dct_Y, q_est, True, category), q_est, True, category)),
-                blockwise_idct(blockwise_dequantization(blockwise_quantization(dct_Cb, q_est, False, category), q_est, False, category)),
-                blockwise_idct(blockwise_dequantization(blockwise_quantization(dct_Cr, q_est, False, category), q_est, False, category))
-            )
-            real_jpeg_psnrs.append(calculate_metrics(img_np, rec_j)[1])
-
-            j2k_graph_q = 0 if tf == 1 else tf
-            rec_k = ycbcr_to_rgb(
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Y, j2k_graph_q), wavelet_type)[:Y.shape[0], :Y.shape[1]],
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cb, j2k_graph_q), wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
-                apply_idwt_2d(adaptive_quantize_dwt(dwt_Cr, j2k_graph_q), wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
-            )
-            real_j2k_psnrs.append(calculate_metrics(img_np, rec_k)[1])
-
-        plot_url = generate_comparison_plot(test_bpps, real_jpeg_psnrs, real_j2k_psnrs)
-
-        # 3. YARDIMCI MOTORLAR
+        # 2. YARDIMCI MOTORLAR
         total_pixels = img_np.shape[0] * img_np.shape[1]
 
         def get_jpeg_result():
@@ -140,23 +118,26 @@ def compress_image():
                 if factor == 1 or c_size <= t_bytes or current_q <= 5: break
                 current_q -= 2
 
-            # DÜZELTİLEN KISIM:
-            # Ekranda gördüğümüz bozulmuş resim ile metriklerin (PSNR, MSE) eşleşmesi için,
-            # RAM'deki bozulmamış resmi değil, diskteki son dosyayı geri okuyup hesaplıyoruz.
+            # Diskteki son halini oku (Histogram ve metrikler için %100 gerçek değerler)
             saved_compressed_img = Image.open(out_path)
             final_np_array = np.array(saved_compressed_img)
             
             mse, psnr, ssim = calculate_metrics(img_np, final_np_array) 
             real_bpp = round((c_size * 8) / total_pixels, 3)
-            return out_name, c_size, mse, psnr, ssim, real_bpp
+            
+            # Histogram için final_np_array'i de döndürüyoruz
+            return out_name, c_size, mse, psnr, ssim, real_bpp, final_np_array
 
-        # 4. MODA GÖRE ÇIKTI
+        # 3. MODA GÖRE ÇIKTI VE HİSTOGRAM OLUŞTURMA
         if mode == 'comparison':
             jpeg_np = get_jpeg_result()
-            j_name, j_size, j_mse, j_psnr, j_ssim, j_bpp = save_and_eval(jpeg_np, "comp_jpeg")
+            j_name, j_size, j_mse, j_psnr, j_ssim, j_bpp, final_j_np = save_and_eval(jpeg_np, "comp_jpeg")
             
             j2k_np = get_j2k_result(j_size)
-            k_name, k_size, k_mse, k_psnr, k_ssim, k_bpp = save_and_eval(j2k_np, "comp_j2k", force_target_bytes=j_size)
+            k_name, k_size, k_mse, k_psnr, k_ssim, k_bpp, final_k_np = save_and_eval(j2k_np, "comp_j2k", force_target_bytes=j_size)
+            
+            # Her iki algoritmayı orijinal ile birlikte histograma çiz
+            plot_url = generate_histogram(img_np, final_j_np, "JPEG", final_k_np, "JPEG 2000")
             
             return jsonify({
                 'mode': 'comparison',
@@ -170,7 +151,11 @@ def compress_image():
 
         else: # Analysis Mode
             final_np = get_jpeg_result() if algorithm == 'jpeg' else get_j2k_result(target_size_bytes)
-            out_name, out_size, mse, psnr, ssim, res_bpp = save_and_eval(final_np, "single")
+            out_name, out_size, mse, psnr, ssim, res_bpp, final_out_np = save_and_eval(final_np, "single")
+            
+            # Seçilen algoritmayı orijinal ile birlikte histograma çiz
+            algo_name = "JPEG" if algorithm == 'jpeg' else "JPEG 2000"
+            plot_url = generate_histogram(img_np, final_out_np, algo_name)
             
             return jsonify({
                 'mode': 'analysis',
