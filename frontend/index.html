@@ -58,9 +58,15 @@
                 <div class="control-group">
                     <label>Wavelet:</label>
                     <select id="waveletSelect">
-                        <option value="haar" selected>Haar</option>  <!-- selected buraya taşındı -->
-        <option value="db1">db1</option>
-        <option value="bior4.4">bior4.4</option>
+                        <option value="haar" selected>Haar (En Hızlı, Bloklu)</option>
+                        <option value="db1">db1 (Haar ile aynı)</option>
+                        <option value="bior4.4">bior4.4 (Simetrik)</option>
+                        
+                        <!-- YENİ EKLENEN FİLTRELER -->
+                        <option value="db3">db3 (Daha Pürüzsüz)</option>
+                        <option value="db6">db6 (Orta Pürüzsüzlük)</option>
+                        <option value="db12">db12 (Yüksek Pürüzsüzlük)</option>
+                        <option value="db24">db24 (Çok Yüksek Pürüzsüzlük)</option>
                     </select>
                 </div>
                 <div class="control-group">
@@ -139,7 +145,7 @@
                     <div class="stat-item">SSIM (JPEG): <span id="jSsim">-</span></div>
                     <div class="stat-item">SSIM (J2K): <span id="kSsim">-</span></div>
                     
-                    <!-- YENİ EKLENEN MSE SATIRLARI -->
+                    <!-- YENİ EKLENEN MSE SATIRLARI (Korundu) -->
                     <div class="stat-item">MSE (JPEG): <span id="jMse">-</span></div>
                     <div class="stat-item">MSE (J2K): <span id="kMse">-</span></div>
                     

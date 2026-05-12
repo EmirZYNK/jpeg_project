@@ -6,6 +6,10 @@ def get_available_wavelets():
         'haar': 'haar',
         'db1': 'db1',
         'db2': 'db2',
+        'db3': 'db3',           # YENİ EKLENDİ
+        'db6': 'db6',           # YENİ EKLENDİ
+        'db12': 'db12',         # YENİ EKLENDİ
+        'db24': 'db24',         # YENİ EKLENDİ
         'bior4.4': 'bior4.4',
         'sym2': 'sym2'
     }
