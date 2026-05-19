@@ -55,7 +55,7 @@ algorithmSelect.addEventListener('change', (e) => {
 ratioSlider.addEventListener('input', (e) => {
     const factor = e.target.value;
     ratioValue.innerText = factor;
-    document.getElementById('targetHint').innerText = factor == 1 ? "Orijinal Kalite" : `~${(24/factor).toFixed(2)} BPP Hedefleniyor`;
+    document.getElementById('targetHint').innerText = factor == 1 ? "" : ``;
 });
 
 // =====================================================================
