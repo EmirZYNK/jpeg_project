@@ -1,201 +1,176 @@
 /* Genel Ayarlar & Catppuccin Renkleri */
 body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Segoe UI', sans-serif;
-    background-color: #11111b;
-    color: #cdd6f4;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* Dış kaydırmayı kapat, iç kısımlar kaysın */
+    margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif;
+    background-color: #11111b; color: #cdd6f4; height: 100vh;
+    display: flex; flex-direction: column; overflow: hidden;
 }
 
 /* Üst Bar */
 .top-bar {
-    height: 60px;
-    background-color: #1e1e2e;
-    border-bottom: 2px solid #89b4fa;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    z-index: 10;
+    height: 60px; background-color: #1e1e2e; border-bottom: 2px solid #89b4fa;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); z-index: 10;
 }
-
 .top-bar h1 { margin: 0; font-size: 24px; color: #89b4fa; }
 
-/* Ana Düzen (Sol Bar ve Sağ İçerik) */
-.app-layout {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-}
+/* Ana Düzen */
+.app-layout { display: flex; flex: 1; overflow: hidden; }
 
 /* --- SOL BAR (Sidebar) --- */
 .sidebar {
-    width: 300px;
-    background-color: #181825;
-    border-right: 1px solid #313244;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    overflow-y: auto;
-    box-shadow: 5px 0 15px rgba(0,0,0,0.3);
-    z-index: 5;
+    width: 300px; background-color: #181825; border-right: 1px solid #313244;
+    padding: 20px; display: flex; flex-direction: column; gap: 20px;
+    overflow-y: auto; box-shadow: 5px 0 15px rgba(0,0,0,0.3); z-index: 5;
 }
-
 .sidebar h2 { margin-top: 0; color: #f5e0dc; border-bottom: 1px solid #313244; padding-bottom: 10px; font-size: 18px;}
-
 .control-group { display: flex; flex-direction: column; gap: 8px; }
-
 label { font-size: 13px; color: #bac2de; font-weight: bold; }
-
 select, input[type="number"], .upload-btn {
-    padding: 10px;
-    border-radius: 8px;
-    border: 1px solid #45475a;
-    background: #1e1e2e;
-    color: #cdd6f4;
-    font-size: 14px;
-    outline: none;
+    padding: 10px; border-radius: 8px; border: 1px solid #45475a; background: #1e1e2e;
+    color: #cdd6f4; font-size: 14px; outline: none;
 }
-
-.upload-btn {
-    cursor: pointer; background: #313244; color: #cdd6f4; border: 1px dashed #89b4fa; transition: 0.2s;
-}
+.upload-btn { cursor: pointer; background: #313244; color: #cdd6f4; border: 1px dashed #89b4fa; transition: 0.2s; }
 .upload-btn:hover { background: #45475a; }
-
 .file-name-hint { font-size: 12px; color: #a6adc8; text-align: center; }
-
 .dwt-params { display: flex; gap: 10px; }
 .dwt-params .control-group { flex: 1; }
-
 input[type="range"] { width: 100%; cursor: pointer; }
 .highlight { color: #a6e3a1; }
 #targetHint { color: #f9e2af; font-size: 12px; }
 
 .primary-btn {
-    background: linear-gradient(135deg, #89b4fa, #b4befe);
-    color: #11111b; border: none; padding: 15px; font-size: 16px; font-weight: bold;
+    background: linear-gradient(135deg, #89b4fa, #b4befe); color: #11111b; border: none; padding: 15px; font-size: 16px; font-weight: bold;
     border-radius: 8px; cursor: pointer; transition: transform 0.2s; margin-top: auto;
 }
 .primary-btn:hover { transform: scale(0.98); }
 .primary-btn:disabled { background: #45475a; cursor: not-allowed; }
 
-/* Mod Seçici (Toggle) Tasarımı (YENİ EKLENDİ) */
-.radio-group {
-    display: flex;
-    background: #1e1e2e;
-    border-radius: 8px;
-    border: 1px solid #45475a;
-    overflow: hidden;
-}
+/* Mod Seçici (Toggle) Tasarımı */
+.radio-group { display: flex; background: #1e1e2e; border-radius: 8px; border: 1px solid #45475a; overflow: hidden; }
 .radio-group input { display: none; }
 .radio-group label {
-    flex: 1;
-    text-align: center;
-    padding: 10px 5px;
-    cursor: pointer;
-    font-size: 12px;
-    color: #a6adc8;
-    transition: background 0.3s, color 0.3s;
-    border-right: 1px solid #313244;
+    flex: 1; text-align: center; padding: 10px 5px; cursor: pointer;
+    font-size: 12px; color: #a6adc8; transition: background 0.3s, color 0.3s; border-right: 1px solid #313244;
 }
 .radio-group label:last-child { border-right: none; }
-.radio-group input:checked + label {
-    background: #89b4fa;
-    color: #11111b;
-    font-weight: bold;
-}
+.radio-group input:checked + label { background: #89b4fa; color: #11111b; font-weight: bold; }
 
 /* --- SAĞ ÇALIŞMA ALANI (Workspace) --- */
 .workspace {
-    flex: 1;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    overflow-y: auto; /* Sağ taraf kendi içinde kaysın */
-    background-image: radial-gradient(circle at 50% 0%, #1e1e2e 0%, transparent 80%);
+    flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 20px;
+    overflow-y: auto; background-image: radial-gradient(circle at 50% 0%, #1e1e2e 0%, transparent 80%);
 }
 
-/* Dev Resim Alanı */
 .image-workspace {
-    width: 100%;
-    min-height: 55vh;
-    background: #181825;
-    border-radius: 12px;
-    border: 1px solid #313244;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    width: 100%; min-height: 55vh; background: #181825; border-radius: 12px;
+    border: 1px solid #313244; display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
-.upload-placeholder {
-    text-align: center; cursor: pointer; padding: 40px; border: 2px dashed #45475a; border-radius: 12px; transition: 0.3s;
-}
+.upload-placeholder { text-align: center; cursor: pointer; padding: 40px; border: 2px dashed #45475a; border-radius: 12px; transition: 0.3s; }
 .upload-placeholder:hover { border-color: #89b4fa; background: rgba(137, 180, 250, 0.05); }
 .upload-placeholder .icon { font-size: 48px; margin-bottom: 10px; }
 .upload-placeholder h3 { margin: 0; color: #bac2de; }
 .upload-placeholder p { color: #6c7086; margin-top: 5px; }
 
-/* Kıyaslama Slider'ı */
+/* =====================================================================
+   RESİM KIYASLAMA ALANI (SLIDER & YAN YANA MANTIĞI)
+   ===================================================================== */
 .comparison-container {
-    width: 100%; height: 100%; position: relative;
+    width: 100%; height: 100%; position: relative; display: block;
 }
-.comparison-container img {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: contain;
+
+/* Wrapper (Kapsayıcı) Divler */
+.img-wrapper {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
 }
-#compressedImage { clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%); }
-.slider-overlay {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: 10; cursor: ew-resize;
+.img-wrapper img {
+    width: 100%; height: 100%; object-fit: contain; pointer-events: none;
 }
-.slider-line {
-    position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: #f38ba8; z-index: 5; pointer-events: none;
+
+/* İşlenmiş Katman - Üstte durur ve Slider ile kesilir */
+#wrapperCompressed {
+    z-index: 2;
+    clip-path: polygon(0 0, 50% 0, 50% 100%, 0 100%);
 }
+/* Orijinal Katman - Altta durur */
+#wrapperOriginal {
+    z-index: 1;
+}
+
+/* Slider Araçları */
+.slider-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; z-index: 10; cursor: ew-resize; }
+.slider-line { position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; background: #f38ba8; z-index: 5; pointer-events: none; }
 .slider-line::after {
     content: '< >'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     background: #f38ba8; color: #11111b; padding: 6px 10px; border-radius: 20px; font-weight: bold; font-size: 14px;
 }
+
+/* Etiketler (Genel) */
 .img-label {
-    position: absolute; top: 10px; padding: 5px 10px; background: rgba(17, 17, 27, 0.7);
+    position: absolute; padding: 5px 10px; background: rgba(17, 17, 27, 0.7);
     color: #cdd6f4; border-radius: 5px; font-size: 12px; z-index: 8; pointer-events: none; font-weight: bold;
 }
-.left-label { left: 10px; color: #a6e3a1; }
-.right-label { right: 10px; color: #89b4fa; }
 
-/* --- İSTATİSTİKLER (Grid Düzeni) --- */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 20px;
+/* SLIDER MODU: Etiket Konumları */
+.comparison-container:not(.side-by-side) #labelCompressed { left: 10px; top: 10px; color: #a6e3a1; }
+.comparison-container:not(.side-by-side) #labelOriginal { right: 10px; top: 10px; color: #cdd6f4; }
+
+/* =====================================================================
+   YAN YANA (SIDE-BY-SIDE) KATI KURALLAR - HATA GİDERİLDİ
+   ===================================================================== */
+.comparison-container.side-by-side {
+    display: flex !important; 
+    flex-direction: row !important; 
+    gap: 15px; 
+    padding: 15px; 
+    box-sizing: border-box;
+    align-items: center; 
+    justify-content: center;
 }
 
-.stat-card {
-    background: rgba(30, 30, 46, 0.8);
-    backdrop-filter: blur(10px);
-    border: 1px solid #313244;
-    border-radius: 12px;
-    padding: 15px;
+.comparison-container.side-by-side .img-wrapper {
+    position: relative !important; 
+    flex: 1 1 50% !important; /* Kutu alanını yarı yarıya kesin olarak böl */
+    height: 100% !important;
+    display: flex !important; 
+    justify-content: center; 
+    align-items: center;
+    background: rgba(0, 0, 0, 0.4); 
+    border-radius: 8px; 
+    border: 1px dashed #45475a; 
 }
 
+/* Slider kesme işlemini ve çubukları tamamen iptal et */
+.comparison-container.side-by-side #wrapperCompressed { clip-path: none !important; }
+.comparison-container.side-by-side .slider-overlay,
+.comparison-container.side-by-side .slider-line { display: none !important; }
+
+/* Yan Yana Modunda Etiketler Tam Ortada Dursun */
+.comparison-container.side-by-side .img-label {
+    top: 10px; left: 50%; transform: translateX(-50%);
+    border: 1px solid #45475a; white-space: nowrap; box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+}
+
+/* KURAL: İSTENDİĞİ GİBİ SOLDA ORİJİNAL, SAĞDA YENİ OUTPUT */
+
+/* 1) Analiz Modu (Orijinal vs İşlenmiş) */
+.comparison-container.side-by-side[data-mode="analysis"] #wrapperOriginal { order: 1; } /* SOL */
+.comparison-container.side-by-side[data-mode="analysis"] #wrapperCompressed { order: 2; } /* SAĞ */
+
+.comparison-container.side-by-side[data-mode="analysis"] #labelOriginal { color: #cdd6f4; }
+.comparison-container.side-by-side[data-mode="analysis"] #labelCompressed { color: #a6e3a1; }
+
+/* 2) Karşılaştırma Modu (JPEG vs J2K) */
+.comparison-container.side-by-side[data-mode="comparison"] #wrapperCompressed { order: 1; } /* JPEG SOLDa */
+.comparison-container.side-by-side[data-mode="comparison"] #wrapperOriginal { order: 2; } /* J2K SAĞDA */
+
+.comparison-container.side-by-side[data-mode="comparison"] #labelCompressed { color: #a6e3a1; }
+.comparison-container.side-by-side[data-mode="comparison"] #labelOriginal { color: #89b4fa; }
+
+/* --- İSTATİSTİKLER VE GRAFİKLER --- */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.stat-card { background: rgba(30, 30, 46, 0.8); backdrop-filter: blur(10px); border: 1px solid #313244; border-radius: 12px; padding: 15px; }
 .stat-card h4 { margin-top: 0; margin-bottom: 10px; color: #f5e0dc; border-bottom: 1px solid #45475a; padding-bottom: 5px; }
-
-.stat-item {
-    display: flex; justify-content: space-between; font-size: 14px; color: #bac2de; margin-bottom: 5px;
-}
-
-/* --- GRAFİK (En Altta) --- */
-.graph-row {
-    background: #1e1e2e;
-    border-radius: 12px;
-    border: 1px solid #313244;
-    padding: 20px;
-    text-align: center;
-}
+.stat-item { display: flex; justify-content: space-between; font-size: 14px; color: #bac2de; margin-bottom: 5px; }
+.graph-row { background: #1e1e2e; border-radius: 12px; border: 1px solid #313244; padding: 20px; text-align: center; }
 .graph-row img { max-width: 100%; border-radius: 8px; }
