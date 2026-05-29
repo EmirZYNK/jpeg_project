@@ -17,7 +17,6 @@
         
         <!-- SOL BAR (Sidebar) -->
         <aside class="sidebar">
-            <!-- LOGO BURAYA TAŞINDI DAHA ŞIK BİR GÖRÜNÜM İÇİN -->
             <header class="brand-header">
                 <h1><span class="brand-img">Img</span><span class="brand-press">Press</span></h1>
                 <p class="brand-subtitle">Compression Studio</p>
@@ -60,6 +59,17 @@
                     <option value="biomedical">Biyomedikal (X-Ray, MR)</option>
                     <option value="fingerprint">Parmak İzi (Güvenlik)</option>
                 </select>
+            </div>
+            
+            <!-- Biyomedikal mod seçildiğinde görünür olacak -->
+            <div class="control-group mode-toggle" id="biomedicalModeGroup" style="display: none;">
+                <label>Sıkıştırma Türü (Biyomedikal):</label>
+                <div class="radio-group">
+                    <input type="radio" id="modeLossy" name="lossyMode" value="true" checked>
+                    <label for="modeLossy">📉 Kayıplı</label>
+                    <input type="radio" id="modeLossless" name="lossyMode" value="false">
+                    <label for="modeLossless">💯 Kayıpsız</label>
+                </div>
             </div>
 
             <div class="control-group" id="algoControlGroup">
@@ -124,52 +134,124 @@
                 </div>
             </div>
 
+            <!-- STAT KARTLARI : ANALİZ MODU -->
             <div class="stats-row" id="statsRowAnalysis" style="display: none;">
                 <div class="stat-card">
                     <h4>Orijinal Resim</h4>
-                    <div class="stat-item">Boyut: <span id="origSize">-</span> KB</div>
-                    <div class="stat-item">Bitrate: <span>24.00</span> BPP</div>
+                    <div class="stat-item">Boyut: <span id="origSize">-</span> KB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-origSize"></div>
+                    </div>
+                    <div class="stat-item">Bitrate: <span id="origBpp">24.00</span> BPP <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-origBpp"></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <h4>İşlenmiş (<span id="resultAlgo">-</span>)</h4>
-                    <div class="stat-item">Boyut: <span id="compSize" class="highlight-text">-</span> KB</div>
-                    <div class="stat-item">Bitrate: <span id="compBpp" class="highlight-text">-</span> BPP</div>
-                    <div class="stat-item">Oran: <span id="compRatio" class="highlight-text">-</span>x</div>
+                    <div class="stat-item">Boyut: <span id="compSize" class="highlight-text">-</span> KB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-compSize"></div>
+                    </div>
+                    <div class="stat-item">Bitrate: <span id="compBpp" class="highlight-text">-</span> BPP <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-compBpp"></div>
+                    </div>
+                    <div class="stat-item">Oran: <span id="compRatio" class="highlight-text">-</span>x <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-compRatio"></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <h4>Kalite Metrikleri</h4>
-                    <div class="stat-item">PSNR: <span id="psnrVal">-</span> dB</div>
-                    <div class="stat-item">SSIM: <span id="ssimVal">-</span></div>
-                    <div class="stat-item">MSE: <span id="mseVal">-</span></div>
+                    <div class="stat-item">PSNR: <span id="psnrVal">-</span> dB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-psnrVal"></div>
+                    </div>
+                    <div class="stat-item">SSIM: <span id="ssimVal">-</span> <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-ssimVal"></div>
+                    </div>
+                    <div class="stat-item">MSE: <span id="mseVal">-</span> <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-mseVal"></div>
+                    </div>
                 </div>
             </div>
 
+            <!-- STAT KARTLARI : KARŞILAŞTIRMA MODU -->
             <div class="stats-row" id="statsRowComparison" style="display: none;">
                 <div class="stat-card">
                     <h4>JPEG (DCT)</h4>
-                    <div class="stat-item">Boyut: <span id="jSize" class="highlight-text">-</span> KB</div>
-                    <div class="stat-item">Bitrate: <span id="jBpp" class="highlight-text">-</span> BPP</div>
-                    <div class="stat-item">PSNR: <span id="jPsnr" class="highlight-text">-</span> dB</div>
+                    <div class="stat-item">Boyut: <span id="jSize" class="highlight-text">-</span> KB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-jSize"></div>
+                    </div>
+                    <div class="stat-item">Bitrate: <span id="jBpp" class="highlight-text">-</span> BPP <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-jBpp"></div>
+                    </div>
+                    <div class="stat-item">PSNR: <span id="jPsnr" class="highlight-text">-</span> dB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-jPsnr"></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <h4>JPEG 2000 (DWT)</h4>
-                    <div class="stat-item">Boyut: <span id="kSize" class="highlight-text">-</span> KB</div>
-                    <div class="stat-item">Bitrate: <span id="kBpp" class="highlight-text">-</span> BPP</div>
-                    <div class="stat-item">PSNR: <span id="kPsnr" class="highlight-text">-</span> dB</div>
+                    <div class="stat-item">Boyut: <span id="kSize" class="highlight-text">-</span> KB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-kSize"></div>
+                    </div>
+                    <div class="stat-item">Bitrate: <span id="kBpp" class="highlight-text">-</span> BPP <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-kBpp"></div>
+                    </div>
+                    <div class="stat-item">PSNR: <span id="kPsnr" class="highlight-text">-</span> dB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-kPsnr"></div>
+                    </div>
                 </div>
                 <div class="stat-card">
                     <h4>Detaylı Analiz</h4>
-                    <div class="stat-item">SSIM (JPEG): <span id="jSsim">-</span></div>
-                    <div class="stat-item">SSIM (J2K): <span id="kSsim">-</span></div>
-                    <div class="stat-item">MSE (JPEG): <span id="jMse">-</span></div>
-                    <div class="stat-item">MSE (J2K): <span id="kMse">-</span></div>
-                    <div class="stat-item" style="margin-top: 5px; border-top: 1px solid var(--border-color); padding-top: 5px;">Orijinal Boyut: <span id="origSizeComp">-</span> KB</div>
+                    <div class="stat-item">SSIM (JPEG): <span id="jSsim">-</span> <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-jSsim"></div>
+                    </div>
+                    <div class="stat-item">SSIM (J2K): <span id="kSsim">-</span> <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-kSsim"></div>
+                    </div>
+                    <div class="stat-item">MSE (JPEG): <span id="jMse">-</span> <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-jMse"></div>
+                    </div>
+                    <div class="stat-item">MSE (J2K): <span id="kMse">-</span> <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-kMse"></div>
+                    </div>
+                    <div class="stat-item" style="margin-top: 5px; border-top: 1px solid var(--border-color); padding-top: 5px;">
+                        Orijinal: <span id="origSizeComp">-</span> KB <span class="info-toggle">▼</span>
+                        <div class="stat-details" id="detail-origSizeComp"></div>
+                    </div>
                 </div>
             </div>
 
+            <!-- GRAFİK ALANLARI -->
             <div class="graph-row" id="graphRow" style="display: none;">
                 <img id="comparisonPlot" src="" alt="Piksel Yoğunluğu Histogramı">
             </div>
+
+            <!-- SUBBAND (KATMAN) ALANI -->
+            <div class="graph-row" id="subbandRow" style="display: none;">
+                <h3 style="color: #f5e0dc; text-align: center; margin-bottom: 10px;">DWT Katmanları (Subbands) - Layer by Layer</h3>
+                <img id="subbandPlot" src="" alt="DWT Subbands" style="max-width: 100%; border-radius: 8px;">
+            </div>
+
+            <!-- HATA HARİTASI (ERROR MAP) ALANI -->
+            <div class="graph-row" id="errorMapRow" style="display: none;">
+                <button id="toggleErrorMapBtn" class="upload-btn" style="margin: 0 auto; display: block; width: fit-content; margin-bottom: 15px;">🔍 Hata Haritasını (Error Map) Göster / Gizle</button>
+                <div id="errorMapContainer" style="display: none; width: 100%;">
+                    <!-- Analiz modunda tek resim -->
+                    <div id="errorMapSingleBox" style="display:none; text-align:center;">
+                        <h4 style="color: #cdd6f4; margin-bottom: 10px;">Error Map (Kayıp Pikseller)</h4>
+                        <img id="errorMapPlot" src="" alt="Hata Haritası" style="max-width: 100%; border-radius: 8px;">
+                    </div>
+                    <!-- Karşılaştırma modunda yan yana iki resim -->
+                    <div id="errorMapCompareBox" style="display: none; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                        <div style="flex: 1; min-width: 300px; text-align: center;">
+                            <h4 style="color: #cdd6f4; margin-bottom: 10px;">JPEG Error Map</h4>
+                            <img id="errorMapJ" src="" style="max-width: 100%; border-radius: 8px;">
+                        </div>
+                        <div style="flex: 1; min-width: 300px; text-align: center;">
+                            <h4 style="color: #cdd6f4; margin-bottom: 10px;">JPEG 2000 Error Map</h4>
+                            <img id="errorMapK" src="" style="max-width: 100%; border-radius: 8px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
     <script src="app.js"></script>

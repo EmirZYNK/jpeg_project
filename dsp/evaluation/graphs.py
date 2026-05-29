@@ -66,3 +66,64 @@ def generate_histogram(original_np, comp1_np, name1, comp2_np=None, name2=None):
     plt.close(fig)
     
     return base64.b64encode(img.getvalue()).decode()
+
+def generate_error_map(original_np, comp_np):
+    """
+    Orijinal ve sıkıştırılmış görüntü arasındaki mutlak farkı
+    hesaplayıp ısı haritası (error map) olarak döndürür.
+    """
+    plt.clf()
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(6, 6))
+    fig.patch.set_facecolor('#1e1e2e')
+    
+    # Boyutları eşitleyelim (kırpma varsa)
+    min_y = min(original_np.shape[0], comp_np.shape[0])
+    min_x = min(original_np.shape[1], comp_np.shape[1])
+    orig = original_np[:min_y, :min_x].astype(np.float32)
+    comp = comp_np[:min_y, :min_x].astype(np.float32)
+    
+    if len(orig.shape) == 3:
+        orig = np.mean(orig, axis=2)
+        comp = np.mean(comp, axis=2)
+        
+    diff = np.abs(orig - comp)
+    
+    im = ax.imshow(diff, cmap='jet')
+    plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    ax.set_title('Hata Haritası (Mutlak Fark)', color='#f5e0dc', pad=15)
+    ax.axis('off')
+    
+    plt.tight_layout()
+    img = io.BytesIO()
+    plt.savefig(img, format='png', bbox_inches='tight', dpi=100)
+    img.seek(0)
+    plt.close(fig)
+    return base64.b64encode(img.getvalue()).decode()
+
+import pywt
+def generate_subband_grid(coeffs):
+    """
+    DWT alt bantlarını (LL, HL, LH, HH) görselleştirip base64 döner.
+    """
+    plt.clf()
+    plt.style.use('dark_background')
+    fig, ax = plt.subplots(figsize=(6, 6))
+    fig.patch.set_facecolor('#1e1e2e')
+    
+    arr, _ = pywt.coeffs_to_array(coeffs)
+    
+    # Kapsamı daraltarak detayları görünür kılalım (log scale)
+    arr = np.abs(arr)
+    arr = np.log1p(arr)
+    
+    ax.imshow(arr, cmap='gray')
+    ax.set_title('DWT Katmanları (Subbands)', color='#f5e0dc', pad=15)
+    ax.axis('off')
+    
+    plt.tight_layout()
+    img = io.BytesIO()
+    plt.savefig(img, format='png', bbox_inches='tight', dpi=100)
+    img.seek(0)
+    plt.close(fig)
+    return base64.b64encode(img.getvalue()).decode()

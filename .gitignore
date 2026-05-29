@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 backend/routes/*-yedek*
+data/outputs/
+data/uploads/
+venv/
+.venv/
