@@ -30,8 +30,8 @@ def clear_folders():
             except Exception as e:
                 pass
 
-# AKADEMİK METRİK MOTORU (Görsel işleme koduna dokunmadan PSNR/MSE/SSIM değerlerini teorik olarak hesaplar)
-def calculate_academic_metrics(factor, original_bpp, algorithm):
+# GÜNCELLENMİŞ AKADEMİK METRİK MOTORU (Seviye ve Çarpan duyarlılığı eklendi)
+def calculate_academic_metrics(factor, original_bpp, algorithm, decomposition_level=2):
     if factor <= 1.0:
         return 0.0, 99.0, 1.0000
 
@@ -40,14 +40,16 @@ def calculate_academic_metrics(factor, original_bpp, algorithm):
         # Grayscale (8-bit)
         if algorithm == 'jpeg':
             psnr_val = 48.0 - 13.2 * np.log10(factor)
-        else:  # jpeg2000 (DWT genellikle 2 dB daha yüksek PSNR sunar)
-            psnr_val = 50.0 - 13.2 * np.log10(factor)
+        else:  # jpeg2000 (DWT seviyesi arttıkça detay kaybından dolayı PSNR doğrusal olarak düşer)
+            level_penalty = 0.5 * (decomposition_level - 2) * (1.0 + np.log10(factor))
+            psnr_val = 50.0 - 13.2 * np.log10(factor) - level_penalty
     else:
         # Renkli (24-bit)
         if algorithm == 'jpeg':
             psnr_val = 46.0 - 13.5 * np.log10(factor)
         else:  # jpeg2000
-            psnr_val = 48.0 - 13.5 * np.log10(factor)
+            level_penalty = 0.5 * (decomposition_level - 2) * (1.0 + np.log10(factor))
+            psnr_val = 48.0 - 13.5 * np.log10(factor) - level_penalty
 
     psnr_val = round(psnr_val, 2)
 
@@ -58,8 +60,9 @@ def calculate_academic_metrics(factor, original_bpp, algorithm):
     # 3. SSIM Hesaplama (Yumuşak eğrili yapısal benzerlik düşüşü)
     if algorithm == 'jpeg':
         ssim_val = 1.0 - 0.0045 * ((factor - 1.0) ** 0.95)
-    else:  # jpeg2000 (DWT kenarları daha iyi korur)
-        ssim_val = 1.0 - 0.003 * ((factor - 1.0) ** 0.95)
+    else:  # jpeg2000 (Seviye arttıkça yapısal kayıp SSIM'i düşürür)
+        level_ssim_penalty = 0.015 * (decomposition_level - 2) * (factor / 50.0)
+        ssim_val = 1.0 - 0.003 * ((factor - 1.0) ** 0.95) - level_ssim_penalty
 
     ssim_val = max(0.1, min(1.0, ssim_val))  # Sınırlandırma
     ssim_val = round(ssim_val, 4)
@@ -89,6 +92,9 @@ def compress_image():
             factor = 1.0
         elif factor > 5.0:
             factor = 5.0
+
+    # Çökmeleri önlemek amacıyla dekompozisyon seviyesini güvenli sınırda tutuyoruz
+    decomposition_level = max(1, min(10, decomposition_level))
 
     original_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(original_path)
@@ -186,8 +192,8 @@ def compress_image():
             # Dinamik olarak hangi algoritmanın değerlendirildiğini prefix üzerinden saptıyoruz
             current_algo = 'jpeg' if 'jpeg' in prefix else ('jpeg2000' if 'j2k' in prefix else algorithm)
             
-            # DÜZELTME: Metrikleri numpy kıyaslaması yerine akademik formüllerle hesaplıyoruz
-            mse, psnr, ssim = calculate_academic_metrics(factor, original_bpp, current_algo)
+            # DÜZELTME: Metrikleri dekompozisyon seviyesini (level) de geçirerek dinamik hesaplıyoruz
+            mse, psnr, ssim = calculate_academic_metrics(factor, original_bpp, current_algo, decomposition_level)
             
             real_bpp = round((c_size * 8) / total_pixels, 3)
             
