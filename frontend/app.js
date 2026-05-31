@@ -33,22 +33,20 @@ const labelOriginal = document.getElementById('labelOriginal');
 const labelCompressed = document.getElementById('labelCompressed');
 
 // =====================================================================
-// DİNAMİK LİMİT KONTROLLERİ (Biomedical)
+// DİNAMİK LİMİT KONTROLLERİ (Biyomedikal Limitleri ve Genel Limitler)
 // =====================================================================
 function checkSliderLimits() {
     if (categorySelect.value === 'biomedical') {
         const isLossy = document.querySelector('input[name="lossyMode"]:checked').value === 'true';
         if (isLossy) {
-            // Kayıplı ise maks 5
             ratioSlider.max = 5;
             if (parseInt(ratioSlider.value) > 5) ratioSlider.value = 5;
         } else {
-            // Kayıpsız ise katsayı 1 kalmalı
             ratioSlider.max = 1;
             ratioSlider.value = 1;
         }
     } else {
-        ratioSlider.max = 20;
+        ratioSlider.max = 100; // DÜZELTME: Maksimum limit artık 100x!
     }
     ratioValue.innerText = ratioSlider.value;
     document.getElementById('targetHint').innerText = ratioSlider.value == 1 ? "Orijinal Kalite" : ``;
@@ -113,8 +111,9 @@ hiddenFileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
         sidebarFileName.innerText = file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name;
-        originalImage.src = URL.createObjectURL(file);
-        
+        const objectURL = URL.createObjectURL(file);
+        originalImage.src = objectURL;
+
         uploadPlaceholder.style.display = 'none';
         compContainer.style.display = 'block';
         wrapperCompressed.style.visibility = 'hidden'; 
@@ -128,9 +127,41 @@ hiddenFileInput.addEventListener('change', (e) => {
         document.getElementById('subbandRow').style.display = 'none';
         document.getElementById('errorMapRow').style.display = 'none';
         
-        const sizeKB = (file.size / 1024).toFixed(2);
-        document.getElementById('origSize').innerText = sizeKB;
-        document.getElementById('origSizeComp').innerText = sizeKB;
+        const tempImg = new Image();
+        tempImg.src = objectURL;
+        tempImg.onload = function() {
+            const w = Math.floor(tempImg.width / 16) * 16;
+            const h = Math.floor(tempImg.height / 16) * 16;
+            
+            // Kanvas yardımıyla resmin grayscale (siyah-beyaz) olup olmadığını mikro saniyeler içinde anlıyoruz
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = Math.min(tempImg.width, 300); // 300px genişliğinde küçük bir örnek taramak yeterlidir
+            canvas.height = Math.min(tempImg.height, 300);
+            ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+            
+            let isGrayscale = true;
+            for (let i = 0; i < imgData.length; i += 16) { // her 4 pikselden birini kontrol et (aşırı hızlı çalışır)
+                if (imgData[i] !== imgData[i+1] || imgData[i+1] !== imgData[i+2]) {
+                    isGrayscale = false;
+                    break;
+                }
+            }
+            
+            const bytesPerPixel = isGrayscale ? 1 : 3;
+            const rawBytes = w * h * bytesPerPixel;
+            const rawKB = (rawBytes / 1024).toFixed(2);
+            
+            document.getElementById('origSize').innerText = rawKB;
+            document.getElementById('origSizeComp').innerText = rawKB;
+            
+            // İlk yükleme ekranındaki Bitrate etiketini siyah-beyazlığa göre ayarlarız (8.00 veya 24.00)
+            const bppEl = document.getElementById('origBpp');
+            if (bppEl) {
+                bppEl.innerText = (bytesPerPixel * 8).toFixed(2);
+            }
+        };
     }
 });
 
@@ -152,28 +183,28 @@ document.querySelectorAll('.info-toggle').forEach(toggle => {
     });
 });
 
-function fillFormulas(prefix, stats, origBytes, totalPixels, metricName) {
-    // prefix = '', 'j', 'k', 'orig' vs.
-    
+function fillFormulas(prefix, stats, origBytes, totalPixels, originalBpp) {
+    // prefix = 'comp', 'j', 'k'
+
     // Boyut Formülü
     if (document.getElementById(`detail-${prefix}Size`)) {
         const kb = (stats.bytes / 1024).toFixed(2);
         document.getElementById(`detail-${prefix}Size`).innerHTML = `
-            <strong>Formül:</strong> Bayt Cinsinden Boyut / 1024 = KB<br>
+            <strong>Formül:</strong> Sıkıştırılmış Ham Boyut = (Toplam Piksel * ${originalBpp === 8 ? 1 : 3}) / Sıkıştırma Çarpanı<br>
             <strong>Bu Resim:</strong> ${stats.bytes} / 1024 = <b style="color:#feb47b">${kb} KB</b>
         `;
     }
     // BPP Formülü
     if (document.getElementById(`detail-${prefix}Bpp`)) {
         document.getElementById(`detail-${prefix}Bpp`).innerHTML = `
-            <strong>Formül:</strong> (Sıkıştırılmış Boyut * 8) / Toplam Piksel<br>
+            <strong>Formül:</strong> (Sıkıştırılmış Boyut (Bayt) * 8) / Toplam Piksel = ${originalBpp} / Sıkıştırma Çarpanı<br>
             <strong>Bu Resim:</strong> (${stats.bytes} * 8) / ${totalPixels} = <b style="color:#feb47b">${stats.bpp} Bits/Pixel</b>
         `;
     }
     // Oran Formülü
     if (document.getElementById(`detail-${prefix}Ratio`)) {
         document.getElementById(`detail-${prefix}Ratio`).innerHTML = `
-            <strong>Formül:</strong> Orijinal Boyut / Sıkıştırılmış Boyut<br>
+            <strong>Formül:</strong> Orijinal Ham Boyut / Sıkıştırılmış Ham Boyut<br>
             <strong>Bu Resim:</strong> ${origBytes} / ${stats.bytes} = <b style="color:#feb47b">${stats.ratio}x</b>
         `;
     }
@@ -251,17 +282,22 @@ compressBtn.addEventListener('click', async () => {
             wrapperCompressed.style.clipPath = `polygon(0 0, 50% 0, 50% 100%, 0 100%)`;
             sliderLine.style.left = '50%';
 
-            // Orijinal İstatistiklerin Formülü
+            // DÜZELTME: Orijinal boyut alanlarını backend'den gelen gerçek ham değere eşitliyoruz
+            document.getElementById('origSize').innerText = data.original_size_kb;
+            document.getElementById('origSizeComp').innerText = data.original_size_kb;
+            document.getElementById('origBpp').innerText = data.original_bpp.toFixed(2);
+
+            // Orijinal İstatistiklerin Formülü ve Etiketleri
             if(document.getElementById('detail-origSize')) {
                 document.getElementById('detail-origSize').innerHTML = `
-                    <strong>Dosya:</strong> Yüklenen Orijinal Boyut<br>
+                    <strong>Dosya:</strong> Yüklenen Orijinal Boyut (Ham Sıkıştırılmamış)<br>
                     <strong>Değer:</strong> ${data.original_size_bytes} Bayt
                 `;
             }
             if(document.getElementById('detail-origBpp')) {
-                document.getElementById('detail-origBpp').innerHTML = `
-                    <strong>Standart:</strong> Sıkıştırılmamış RGB Görüntü (8 bit R + 8 bit G + 8 bit B) = 24 BPP
-                `;
+                document.getElementById('detail-origBpp').innerHTML = data.original_bpp === 8 ? 
+                    `<strong>Standart:</strong> Sıkıştırılmamış Grayscale Görüntü (1 kanal * 8 bit) = 8 BPP` :
+                    `<strong>Standart:</strong> Sıkıştırılmamış RGB Görüntü (8 bit R + 8 bit G + 8 bit B) = 24 BPP`;
             }
             if(document.getElementById('detail-origSizeComp')) {
                 document.getElementById('detail-origSizeComp').innerHTML = `<strong>Orijinal Dosya:</strong> ${data.original_size_bytes} Bayt`;
@@ -286,10 +322,10 @@ compressBtn.addEventListener('click', async () => {
                 document.getElementById('kSsim').innerText = data.j2k_stats.ssim;
                 document.getElementById('kMse').innerText = data.j2k_stats.mse;
 
-                fillFormulas('j', data.jpeg_stats, data.original_size_bytes, data.total_pixels);
-                fillFormulas('k', data.j2k_stats, data.original_size_bytes, data.total_pixels);
+                // fillFormulas fonksiyonuna dinamik bpp parametresini ekliyoruz
+                fillFormulas('j', data.jpeg_stats, data.original_size_bytes, data.total_pixels, data.original_bpp);
+                fillFormulas('k', data.j2k_stats, data.original_size_bytes, data.total_pixels, data.original_bpp);
 
-                // Error Map ve Subbands
                 document.getElementById('errorMapRow').style.display = 'block';
                 document.getElementById('errorMapSingleBox').style.display = 'none';
                 document.getElementById('errorMapCompareBox').style.display = 'flex';
@@ -323,9 +359,8 @@ compressBtn.addEventListener('click', async () => {
                     bpp: data.bpp, ratio: data.compression_ratio,
                     mse: data.mse, psnr: data.psnr, ssim: data.ssim
                 };
-                fillFormulas('comp', singleStats, data.original_size_bytes, data.total_pixels);
+                fillFormulas('comp', singleStats, data.original_size_bytes, data.total_pixels, data.original_bpp);
 
-                // Error Map ve Subbands
                 document.getElementById('errorMapRow').style.display = 'block';
                 document.getElementById('errorMapCompareBox').style.display = 'none';
                 document.getElementById('errorMapSingleBox').style.display = 'block';
