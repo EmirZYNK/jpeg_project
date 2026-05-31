@@ -46,7 +46,8 @@ function checkSliderLimits() {
             ratioSlider.value = 1;
         }
     } else {
-        ratioSlider.max = 100; // DÜZELTME: Maksimum limit artık 100x!
+        // Değişen Kısım: 100 -> 50
+        ratioSlider.max = 50; 
     }
     ratioValue.innerText = ratioSlider.value;
     document.getElementById('targetHint').innerText = ratioSlider.value == 1 ? "Orijinal Kalite" : ``;
