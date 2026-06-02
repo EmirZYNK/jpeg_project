@@ -15,6 +15,76 @@ from dsp.decoder.inverse_dwt import apply_idwt_2d
 from dsp.evaluation.metrics import calculate_metrics
 from dsp.evaluation.graphs import generate_histogram, generate_error_map, generate_subband_grid
 
+# --- YENİ EKLENEN YARDIMCI FONKSİYONLAR (Progressive Resolution & ROI) ---
+
+def apply_progressive_scalability(coeffs, decode_layers, level):
+    """
+    Slayt 49, 50, 84 ve 93'te gösterilen Diyadik Ağaç (Dyadic Tree) yapısında çözünürlük ölçeklemesi yapar.
+    Belirtilen çözünürlük katmanından (decode_layers) daha yüksek seviyedeki detay katsayılarını sıfırlar.
+    """
+    # coeffs yapısı: [LL_n, (LH_n, HL_n, HH_n), ..., (LH_1, HL_1, HH_1)]
+    if 1 <= decode_layers < level:
+        new_coeffs = [coeffs[0]]
+        for i in range(1, len(coeffs)):
+            if i <= decode_layers:
+                new_coeffs.append(coeffs[i])
+            else:
+                # Daha yüksek çözünürlük seviyelerindeki detay katsayılarını sıfırlıyoruz
+                zero_details = tuple(np.zeros_like(subband) for subband in coeffs[i])
+                new_coeffs.append(zero_details)
+        return new_coeffs
+    return coeffs
+
+def apply_subband_roi(subband_matrix, cx, cy, r, q_step):
+    """
+    Slayt 98 ve 101'de açıklanan İlgi Bölgesi (ROI) maskelemesini DWT alt bandına uygular.
+    ROI alanı içindeki katsayıları SIFIR KAYIPLA (unquantized) aynen korur,
+    ROI dışındaki (arka plan) katsayıları ağır kuantize ederek flu hale getirir.
+    """
+    h, w = subband_matrix.shape
+    y_indices, x_indices = np.ogrid[:h, :w]
+    
+    # Göreceli koordinatları alt bandın piksel boyutlarına uyarlıyoruz
+    sub_cx = cx * w
+    sub_cy = cy * h
+    sub_r = r * max(h, w)
+    
+    dist_sq = (x_indices - sub_cx)**2 + (y_indices - sub_cy)**2
+    inside_roi = dist_sq <= sub_r**2
+    
+    quantized = np.zeros_like(subband_matrix)
+    
+    # ROI İçi: Sıfır kuantizasyon (kayıpsız) uygulayarak orijinal pikselleri kusursuz netlikte koruyoruz!
+    quantized[inside_roi] = subband_matrix[inside_roi]
+    
+    # ROI Dışı (Arka Plan): Ağır kuantizasyon uygulanarak yumuşatılır/blurlanır
+    heavy_step = q_step * 15.0  # Arka plandaki blurlanma farkını daha keskin hissettirmek için çarpanı 15.0 yaptık
+    quantized[~inside_roi] = np.round(subband_matrix[~inside_roi] / heavy_step) * heavy_step
+    
+    return quantized
+
+def apply_roi_coding(coeffs, cx, cy, r, q_step):
+    """
+    Tüm DWT katsayı ağacına hiyerarşik olarak İlgi Bölgesi (ROI) kodlaması uygular.
+    """
+    new_coeffs = []
+    # LL bandı (coeffs[0]): Görüntünün genel yapı, parlaklık ve renk dengesini 
+    # tamamen korumak adına kuantizasyon uygulanmadan kayıpsız olarak saklanır.
+    ll_band = coeffs[0]
+    new_coeffs.append(ll_band)
+    
+    # Detay bandları (LH, HL, HH): ROI maskesi uygulanır
+    for i in range(1, len(coeffs)):
+        level_details = []
+        for subband in coeffs[i]:
+            quantized_subband = apply_subband_roi(subband, cx, cy, r, q_step)
+            level_details.append(quantized_subband)
+        new_coeffs.append(tuple(level_details))
+        
+    return new_coeffs
+
+# ----------------------------------------------------------------------
+
 compression_bp = Blueprint('compression', __name__)
 UPLOAD_FOLDER = '../data/uploads'
 OUTPUT_FOLDER = '../data/outputs'
@@ -126,9 +196,15 @@ def compress_image():
     category = request.form.get('category', 'natural')
     lossy_mode = request.form.get('lossyMode', 'true') == 'true'
 
+    # --- YENİ EKLENEN FORM VERİLERİ (Çözünürlük Katmanı & ROI) ---
+    decode_layers = int(request.form.get('decodeLayers', 0))
+    roi_enabled = request.form.get('roiEnabled', 'false') == 'true'
+    roi_cx = float(request.form.get('roiX', 50)) / 100.0  # % -> 0.0 - 1.0 arası oran
+    roi_cy = float(request.form.get('roiY', 50)) / 100.0
+    roi_r = float(request.form.get('roiR', 25)) / 100.0
+
     # Sıkıştırma faktörünün ezilmesini engelleyen güncel blok:
     is_lossless_mode = (category in ('biomedical', 'fingerprint'))
-
 
     if is_lossless_mode:
         # Kayıpsız modda arayüzden gelen hesaplanmış Max Lossless X oranını bozmadan aynen koruyoruz
@@ -215,7 +291,6 @@ def compress_image():
 
         def get_j2k_result():
             if is_lossless_mode:
-                # Orijinal pikselleri kayıpsız olarak birebir geri veriyoruz
                 if is_grayscale:
                     return np.stack([Y, Y, Y], axis=-1)
                 else:
@@ -223,19 +298,49 @@ def compress_image():
 
             q_step = 1.0 + 3.0 * (factor - 1.0) if factor > 1.0 else 1.0
             
-            q_w_Y = adaptive_quantize_dwt(dwt_Y, q_step)
-            recon_Y = apply_idwt_2d(q_w_Y, wavelet_type)[:Y.shape[0], :Y.shape[1]]
+            # Katsayı ağaçlarını listeye çeviriyoruz
+            dwt_Y_proc = list(dwt_Y)
+            if not is_grayscale:
+                dwt_Cb_proc = list(dwt_Cb)
+                dwt_Cr_proc = list(dwt_Cr)
+                
+            # --- Diyadik Ağaç Çözünürlük Ölçeklemesi (Progressive Decoding) ---
+            if decode_layers > 0:
+                dwt_Y_proc = apply_progressive_scalability(dwt_Y_proc, decode_layers, decomposition_level)
+                if not is_grayscale:
+                    dwt_Cb_proc = apply_progressive_scalability(dwt_Cb_proc, decode_layers, decomposition_level)
+                    dwt_Cr_proc = apply_progressive_scalability(dwt_Cr_proc, decode_layers, decomposition_level)
             
-            if is_grayscale:
-                return np.stack([recon_Y, recon_Y, recon_Y], axis=-1)
+            # --- İlgi Bölgesi (ROI) Kodlama ---
+            if roi_enabled:
+                q_w_Y = apply_roi_coding(dwt_Y_proc, roi_cx, roi_cy, roi_r, q_step)
+                recon_Y = apply_idwt_2d(q_w_Y, wavelet_type)[:Y.shape[0], :Y.shape[1]]
+                
+                if is_grayscale:
+                    return np.stack([recon_Y, recon_Y, recon_Y], axis=-1)
+                else:
+                    q_w_Cb = apply_roi_coding(dwt_Cb_proc, roi_cx, roi_cy, roi_r, q_step)
+                    q_w_Cr = apply_roi_coding(dwt_Cr_proc, roi_cx, roi_cy, roi_r, q_step)
+                    return ycbcr_to_rgb(
+                        recon_Y,
+                        apply_idwt_2d(q_w_Cb, wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
+                        apply_idwt_2d(q_w_Cr, wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
+                    )
             else:
-                q_w_Cb = adaptive_quantize_dwt(dwt_Cb, q_step)
-                q_w_Cr = adaptive_quantize_dwt(dwt_Cr, q_step)
-                return ycbcr_to_rgb(
-                    recon_Y,
-                    apply_idwt_2d(q_w_Cb, wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
-                    apply_idwt_2d(q_w_Cr, wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
-                )
+                # Standart kuantizasyon akışı
+                q_w_Y = adaptive_quantize_dwt(dwt_Y_proc, q_step)
+                recon_Y = apply_idwt_2d(q_w_Y, wavelet_type)[:Y.shape[0], :Y.shape[1]]
+                
+                if is_grayscale:
+                    return np.stack([recon_Y, recon_Y, recon_Y], axis=-1)
+                else:
+                    q_w_Cb = adaptive_quantize_dwt(dwt_Cb_proc, q_step)
+                    q_w_Cr = adaptive_quantize_dwt(dwt_Cr_proc, q_step)
+                    return ycbcr_to_rgb(
+                        recon_Y,
+                        apply_idwt_2d(q_w_Cb, wavelet_type)[:Cb.shape[0], :Cb.shape[1]],
+                        apply_idwt_2d(q_w_Cr, wavelet_type)[:Cr.shape[0], :Cr.shape[1]]
+                    )
 
         def save_and_eval(np_img, prefix):
             out_name = f"{prefix}_{int(time.time())}.png"

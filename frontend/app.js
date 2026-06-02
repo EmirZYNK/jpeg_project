@@ -108,6 +108,7 @@ modeRadios.forEach(radio => {
             labelCompressed.innerText = 'İşlenmiş Resim';
             labelOriginal.innerText = 'Orijinal Resim';
         }
+        updateROIOverlay();
     });
 });
 
@@ -182,7 +183,7 @@ hiddenFileInput.addEventListener('change', (e) => {
             document.getElementById('origSize').innerText = rawKB;
             document.getElementById('origSizeComp').innerText = rawKB;
             
-            // İlk yükleme ekranındaki Bitrate etiketini siyah-beyazlığa göre ayarlarız (8.00 veya 24.00)
+            // İlk yükleme ekranındaki Bitrate etiketini siyah-beyazlığa göre ayarlariz (8.00 veya 24.00)
             const bppEl = document.getElementById('origBpp');
             if (bppEl) {
                 bppEl.innerText = (bytesPerPixel * 8).toFixed(2);
@@ -307,6 +308,13 @@ compressBtn.addEventListener('click', async () => {
     formData.append('category', categorySelect.value);
     formData.append('wavelet', document.getElementById('waveletSelect').value);
     formData.append('level', document.getElementById('levelInput').value);
+    
+    // YENİ PARAMETRELERİN BACKEND'E GÖNDERİLMESİ
+    formData.append('decodeLayers', decodeLayersSelect.value);
+    formData.append('roiEnabled', roiCheckbox.checked);
+    formData.append('roiX', roiXSlider.value);
+    formData.append('roiY', roiYSlider.value);
+    formData.append('roiR', roiRSlider.value);
     
     // Tıbbi veya parmak izi kategorilerinde kayıpsız modun (lossyMode = false) otomatik iletilmesini sağlıyoruz:
     const category = categorySelect.value;
@@ -443,4 +451,109 @@ compressBtn.addEventListener('click', async () => {
         compressBtn.disabled = false;
         updateUIForLossless(); // İşlem bittiğinde buton yazısının kayıpsız mod durumuna göre kalmasını sağlar
     }
+});
+
+// =====================================================================
+// GERÇEK ZAMANLI ROI VİZÖR GÖRSELLEŞTİRME VE KATMAN MOTORU
+// =====================================================================
+const decodeLayersSelect = document.getElementById('decodeLayersSelect');
+const roiCheckbox = document.getElementById('roiCheckbox');
+const roiControls = document.getElementById('roiControls');
+const roiXSlider = document.getElementById('roiXSlider');
+const roiYSlider = document.getElementById('roiYSlider');
+const roiRSlider = document.getElementById('roiRSlider');
+const roiXVal = document.getElementById('roiXVal');
+const roiYVal = document.getElementById('roiYVal');
+const roiRVal = document.getElementById('roiRVal');
+const levelInput = document.getElementById('levelInput');
+
+// Slayt 93'teki çözünürlük oranlarını dinamik hesaplayan fonksiyon
+function updateDecodeLayersOptions() {
+    if (!levelInput || !decodeLayersSelect) return;
+    const level = parseInt(levelInput.value) || 1;
+    
+    decodeLayersSelect.innerHTML = '<option value="0">Tümü (Tam Çözünürlük - %100)</option>';
+    for (let i = 1; i <= level; i++) {
+        const percent = Math.round(100 / Math.pow(2, level - i));
+        decodeLayersSelect.innerHTML += `<option value="${i}">Layer ${i} (Sadece İlk %${percent} Çözünürlük)</option>`;
+    }
+}
+
+// Seviye girdisi değiştikçe katman seçeneklerini de güncel tutuyoruz
+levelInput.addEventListener('input', updateDecodeLayersOptions);
+document.addEventListener('DOMContentLoaded', updateDecodeLayersOptions);
+
+// Sayfa ilk yüklendiğinde seçeneklerin anında hesaplanması için çağrı
+updateDecodeLayersOptions();
+
+// REAL-TIME VİZÖR GÜNCELLEME FONKSİYONU
+function updateROIOverlay() {
+    let overlay = document.getElementById('roiVisualOverlay');
+    
+    // Eğer görsel daire DOM'da yoksa dinamik olarak oluşturup stillendiriyoruz
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'roiVisualOverlay';
+        
+        // compContainer'ın pozisyonlama bağlamını (relative) garantiye alıyoruz
+        compContainer.style.position = 'relative';
+        
+        overlay.style.position = 'absolute';
+        overlay.style.border = '2.5px dashed #ff7e5f'; // Turuncu kesikli çizgiler
+        overlay.style.background = 'rgba(255, 126, 95, 0.15)'; // Hafif turuncu şeffaf dolgu
+        overlay.style.boxShadow = '0 0 15px rgba(255, 126, 95, 0.6)'; // Parlama efekti
+        overlay.style.borderRadius = '50%';
+        overlay.style.pointerEvents = 'none'; // Resim karşılaştırma sürgüsünün engellenmesini önler
+        overlay.style.transform = 'translate(-50%, -50%)'; // Merkezi (X,Y) noktasına hizalar
+        overlay.style.zIndex = '999'; // En üstte görünmesini sağlar
+        overlay.style.display = 'none';
+        compContainer.appendChild(overlay);
+    }
+
+    // ROI aktifse ve resim alanı görünür durumdaysa vizörü göster ve güncelle
+    if (roiCheckbox && roiCheckbox.checked && compContainer.style.display !== 'none') {
+        overlay.style.display = 'block';
+        
+        // Konumlandırma (Yüzdesel)
+        const x = roiXSlider.value;
+        const y = roiYSlider.value;
+        overlay.style.left = `${x}%`;
+        overlay.style.top = `${y}%`;
+
+        // Boyutlandırma (Python backend'indeki "max(h, w)" ölçeklemesine birebir uyumlu piksel hesabı)
+        const r = parseFloat(roiRSlider.value);
+        const rect = compContainer.getBoundingClientRect();
+        const maxDim = Math.max(rect.width, rect.height);
+        const diameter = (r * 2 / 100) * maxDim;
+        
+        overlay.style.width = `${diameter}px`;
+        overlay.style.height = `${diameter}px`;
+    } else {
+        overlay.style.display = 'none';
+    }
+}
+
+// Pencere boyutu değiştiğinde vizörün konumunu ve boyutunu otomatik yeniden hesaplatıyoruz
+window.addEventListener('resize', updateROIOverlay);
+
+// Tüm sürgülere ve kutucuklara anlık vizör dinleyicisi bağlıyoruz
+roiCheckbox.addEventListener('change', (e) => {
+    roiControls.style.display = e.target.checked ? 'flex' : 'none';
+    updateROIOverlay();
+});
+
+roiXSlider.addEventListener('input', (e) => {
+    roiXVal.innerText = e.target.value;
+    updateROIOverlay();
+});
+
+roiYSlider.addEventListener('input', (e) => {
+    roiYVal.innerText = e.target.value;
+    updateROIOverlay();
+});
+
+// Sürükleme anında daha yumuşak çalışması için 'input' olayını dinliyoruz
+roiRSlider.addEventListener('input', (e) => {
+    roiRVal.innerText = e.target.value;
+    updateROIOverlay();
 });
