@@ -33,32 +33,57 @@ const labelOriginal = document.getElementById('labelOriginal');
 const labelCompressed = document.getElementById('labelCompressed');
 
 // =====================================================================
-// DİNAMİK LİMİT KONTROLLERİ (Biyomedikal Limitleri ve Genel Limitler)
+// DİNAMİK LİMİT KONTROLLERİ (Biyomedikal, Parmak İzi ve Genel Limitler)
 // =====================================================================
 function checkSliderLimits() {
-    if (categorySelect.value === 'biomedical') {
-        const isLossy = document.querySelector('input[name="lossyMode"]:checked').value === 'true';
-        if (isLossy) {
-            ratioSlider.max = 5;
-            if (parseInt(ratioSlider.value) > 5) ratioSlider.value = 5;
+    const category = categorySelect.value;
+    if (category === 'biomedical' || category === 'fingerprint') {
+        // Otomatik modda yuvarlamayı önlemek için adımı geçici olarak ondalıklı yapıyoruz
+        ratioSlider.step = "0.01"; 
+        if (window.maxLosslessRatio) {
+            ratioSlider.max = window.maxLosslessRatio;
+            ratioSlider.value = window.maxLosslessRatio;
         } else {
             ratioSlider.max = 1;
             ratioSlider.value = 1;
         }
     } else {
-        // Değişen Kısım: 100 -> 50
+        // Manuel kontrol edilen tüm modlarda adım kesinlikle tam sayı (1) olarak kalır!
+        ratioSlider.step = "1"; 
         ratioSlider.max = 50; 
     }
     ratioValue.innerText = ratioSlider.value;
     document.getElementById('targetHint').innerText = ratioSlider.value == 1 ? "Orijinal Kalite" : ``;
 }
 
+// KAYIPSIZ MOD ARABİRİM KONTROLÜ (Sürgü kilidi açıldığında adımı tam sayıya geri döndürür)
+function updateUIForLossless() {
+    const category = categorySelect.value;
+    const isLossless = (category === 'biomedical' || category === 'fingerprint');
+    
+    if (isLossless && window.maxLosslessRatio) {
+        ratioSlider.step = "0.01"; // Otomatik kilitleme için ondalık izni
+        compressBtn.innerText = `Kayıpsız Sıkıştır (Maksimum: ${window.maxLosslessRatio}x)`;
+        ratioSlider.max = window.maxLosslessRatio;
+        ratioSlider.value = window.maxLosslessRatio;
+        ratioValue.innerText = window.maxLosslessRatio;
+        ratioSlider.disabled = true; // Sürgü kilitli olduğu için kullanıcı manuel kaydıramaz
+        document.getElementById('targetHint').innerText = "Kayıpsız Sıkıştırma Oranı (Kilitli)";
+    } else {
+        compressBtn.innerText = "Sıkıştırmayı Başlat";
+        ratioSlider.step = "1"; // Sürgü açıldığı an manuel kaydırma için tam sayı (1) moduna döner
+        ratioSlider.disabled = false;
+    }
+}
+
+// SEÇİM KUTUSU EVENT LISTENER'LARININ GÜNCELLENMESİ
 categorySelect.addEventListener('change', (e) => {
-    biomedicalModeGroup.style.display = e.target.value === 'biomedical' ? 'flex' : 'none';
+    biomedicalModeGroup.style.display = 'none'; // Kayıplı/Kayıpsız seçim kutusunu her zaman gizliyoruz
     checkSliderLimits();
+    updateUIForLossless();
 });
 
-lossyRadios.forEach(r => r.addEventListener('change', checkSliderLimits));
+// Not: lossyRadios için tanımlanan eski event listener döngüsü temizlenmiştir.
 
 ratioSlider.addEventListener('input', (e) => {
     ratioValue.innerText = e.target.value;
@@ -130,7 +155,7 @@ hiddenFileInput.addEventListener('change', (e) => {
         
         const tempImg = new Image();
         tempImg.src = objectURL;
-        tempImg.onload = function() {
+        tempImg.onload = async function() {
             const w = Math.floor(tempImg.width / 16) * 16;
             const h = Math.floor(tempImg.height / 16) * 16;
             
@@ -161,6 +186,25 @@ hiddenFileInput.addEventListener('change', (e) => {
             const bppEl = document.getElementById('origBpp');
             if (bppEl) {
                 bppEl.innerText = (bytesPerPixel * 8).toFixed(2);
+            }
+
+            // GÖRSEL YÜKLENDİKTEN SONRA KAYIPSIZ MAKSİMUM ORANI HESAPLIYORUZ
+            const formData = new FormData();
+            formData.append('image', file);
+            try {
+                const response = await fetch('/api/calculate-lossless-max', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    window.maxLosslessRatio = data.max_lossless_ratio;
+                    console.log("Maksimum Kayıpsız Oran Saptandı:", window.maxLosslessRatio);
+                    checkSliderLimits();
+                    updateUIForLossless();
+                }
+            } catch (err) {
+                console.error("Kayıpsız oran sorgulama hatası:", err);
             }
         };
     }
@@ -264,8 +308,14 @@ compressBtn.addEventListener('click', async () => {
     formData.append('wavelet', document.getElementById('waveletSelect').value);
     formData.append('level', document.getElementById('levelInput').value);
     
-    const lossyMode = document.querySelector('input[name="lossyMode"]:checked');
-    if(lossyMode) formData.append('lossyMode', lossyMode.value);
+    // Tıbbi veya parmak izi kategorilerinde kayıpsız modun (lossyMode = false) otomatik iletilmesini sağlıyoruz:
+    const category = categorySelect.value;
+    if (category === 'biomedical' || category === 'fingerprint') {
+        formData.append('lossyMode', 'false');
+    } else {
+        const lossyMode = document.querySelector('input[name="lossyMode"]:checked');
+        if(lossyMode) formData.append('lossyMode', lossyMode.value);
+    }
 
     compressBtn.innerText = "İşleniyor...";
     compressBtn.disabled = true;
@@ -390,7 +440,7 @@ compressBtn.addEventListener('click', async () => {
         console.error(error);
         alert("Bağlantı hatası!");
     } finally {
-        compressBtn.innerText = "Sıkıştırmayı Başlat";
         compressBtn.disabled = false;
+        updateUIForLossless(); // İşlem bittiğinde buton yazısının kayıpsız mod durumuna göre kalmasını sağlar
     }
 });

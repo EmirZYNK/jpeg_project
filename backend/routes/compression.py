@@ -30,9 +30,10 @@ def clear_folders():
             except Exception as e:
                 pass
 
-# GÜNCELLENMİŞ AKADEMİK METRİK MOTORU (Seviye ve Çarpan duyarlılığı eklendi)
-def calculate_academic_metrics(factor, original_bpp, algorithm, decomposition_level=2):
-    if factor <= 1.0:
+# GÜNCELLENMİŞ AKADEMİK METRİK MOTORU (Seviye, Çarpan ve Kayıpsız modu duyarlılığı eklendi)
+def calculate_academic_metrics(factor, original_bpp, algorithm, decomposition_level=2, is_lossless=False):
+    # Kayıpsız sıkıştırmada tüm kalite değerleri mükemmel (kayıpsız) olarak döner
+    if is_lossless or factor <= 1.0:
         return 0.0, 99.0, 1.0000
 
     # 1. PSNR Hesaplama (8-bit/24-bit ve JPEG/JPEG2000 logaritmik eğrileri)
@@ -70,6 +71,44 @@ def calculate_academic_metrics(factor, original_bpp, algorithm, decomposition_le
     return mse_val, psnr_val, ssim_val
 
 
+# YENİ ROTA: GÖRSEL YÜKLENDİĞİNDE KAYIPSIZ MAKSİMUM ORANI HESAPLAMA (DPCM Entropisi Tabanlı)
+@compression_bp.route('/calculate-lossless-max', methods=['POST'])
+def get_lossless_max():
+    if 'image' not in request.files:
+        return jsonify({'error': 'Resim seçilmedi.'}), 400
+    
+    file = request.files['image']
+    try:
+        img_raw = Image.open(file.stream)
+        img_np = np.array(img_raw)
+        
+        # Entropi hesabı için gri tonlamaya çeviriyoruz
+        if len(img_np.shape) == 3:
+            gray = np.dot(img_np[..., :3], [0.2989, 0.5870, 0.1140])
+        else:
+            gray = img_np
+
+        # Birinci derece yatay fark (DPCM öngörü hatası analizi)
+        diff = (gray[:, 1:] - gray[:, :-1]).astype(np.int16)
+        shifted_diff = diff + 255
+        hist = np.bincount(shifted_diff.ravel(), minlength=511)
+        probs = hist / hist.sum()
+        probs = probs[probs > 0]
+        entropy = -np.sum(probs * np.log2(probs))
+        
+        # Kodlayıcı ek yükünü (overhead) simüle etmek için tolerans ekliyoruz
+        coder_entropy = max(entropy + 0.05, 0.5)
+        predicted_ratio = 8.0 / coder_entropy
+        
+        # Tıbbi ve parmak izi görselleri için gerçekçi limitler (1.2x ile 8.0x arası)
+        predicted_ratio = np.clip(predicted_ratio, 1.2, 8.0)
+        max_ratio = round(float(predicted_ratio), 2)
+        
+        return jsonify({'max_lossless_ratio': max_ratio}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @compression_bp.route('/compress', methods=['POST'])
 def compress_image():
     clear_folders()
@@ -87,10 +126,15 @@ def compress_image():
     category = request.form.get('category', 'natural')
     lossy_mode = request.form.get('lossyMode', 'true') == 'true'
 
-    if category == 'biomedical':
-        if not lossy_mode:
-            factor = 1.0
-        elif factor > 5.0:
+    # Sıkıştırma faktörünün ezilmesini engelleyen güncel blok:
+    is_lossless_mode = (category in ('biomedical', 'fingerprint'))
+
+
+    if is_lossless_mode:
+        # Kayıpsız modda arayüzden gelen hesaplanmış Max Lossless X oranını bozmadan aynen koruyoruz
+        pass
+    elif category == 'biomedical':
+        if factor > 5.0:
             factor = 5.0
 
     # Çökmeleri önlemek amacıyla dekompozisyon seviyesini güvenli sınırda tutuyoruz
@@ -144,8 +188,15 @@ def compress_image():
             dwt_Cb = apply_dwt_2d(Cb, wavelet_type, decomposition_level)
             dwt_Cr = apply_dwt_2d(Cr, wavelet_type, decomposition_level)
 
-        # 2. YARDIMCI MOTORLAR (GÖRSEL SİMÜLASYON MOTORUNUZ KORUNDU)
+        # 2. YARDIMCI MOTORLAR
         def get_jpeg_result():
+            if is_lossless_mode:
+                # Orijinal pikselleri kayıpsız olarak birebir geri veriyoruz
+                if is_grayscale:
+                    return np.stack([Y, Y, Y], axis=-1)
+                else:
+                    return ycbcr_to_rgb(Y, Cb, Cr)
+
             q_est = max(1, int(100.0 / factor))
             
             q_Y = blockwise_quantization(dct_Y, q_est, True, category)
@@ -163,6 +214,13 @@ def compress_image():
                 )
 
         def get_j2k_result():
+            if is_lossless_mode:
+                # Orijinal pikselleri kayıpsız olarak birebir geri veriyoruz
+                if is_grayscale:
+                    return np.stack([Y, Y, Y], axis=-1)
+                else:
+                    return ycbcr_to_rgb(Y, Cb, Cr)
+
             q_step = 1.0 + 3.0 * (factor - 1.0) if factor > 1.0 else 1.0
             
             q_w_Y = adaptive_quantize_dwt(dwt_Y, q_step)
@@ -192,8 +250,10 @@ def compress_image():
             # Dinamik olarak hangi algoritmanın değerlendirildiğini prefix üzerinden saptıyoruz
             current_algo = 'jpeg' if 'jpeg' in prefix else ('jpeg2000' if 'j2k' in prefix else algorithm)
             
-            # DÜZELTME: Metrikleri dekompozisyon seviyesini (level) de geçirerek dinamik hesaplıyoruz
-            mse, psnr, ssim = calculate_academic_metrics(factor, original_bpp, current_algo, decomposition_level)
+            # Metrikleri dekompozisyon seviyesini (level) ve kayıpsız durum parametresini de geçirerek dinamik hesaplıyoruz
+            mse, psnr, ssim = calculate_academic_metrics(
+                factor, original_bpp, current_algo, decomposition_level, is_lossless=is_lossless_mode
+            )
             
             real_bpp = round((c_size * 8) / total_pixels, 3)
             
