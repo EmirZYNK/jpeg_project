@@ -486,48 +486,88 @@ document.addEventListener('DOMContentLoaded', updateDecodeLayersOptions);
 // Sayfa ilk yüklendiğinde seçeneklerin anında hesaplanması için çağrı
 updateDecodeLayersOptions();
 
+
+// RESMİN EKRANDA KAPLADIĞI GERÇEK ALANI HESAPLAYAN YARDIMCI FONKSİYON
+function getActiveImageRect() {
+    const img = originalImage;
+    if (!img || !img.complete || img.naturalWidth === 0) {
+        return compContainer.getBoundingClientRect();
+    }
+    
+    const containerRect = compContainer.getBoundingClientRect();
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const containerRatio = containerRect.width / containerRect.height;
+    
+    let width, height, left, top;
+    
+    if (imgRatio > containerRatio) {
+        // Resim yatayda geniş (üst ve altta boşluklar var)
+        width = containerRect.width;
+        height = containerRect.width / imgRatio;
+        left = containerRect.left;
+        top = containerRect.top + (containerRect.height - height) / 2;
+    } else {
+        // Resim dikeyde dar (sağ ve solda boşluklar var)
+        height = containerRect.height;
+        width = containerRect.height * imgRatio;
+        left = containerRect.left + (containerRect.width - width) / 2;
+        top = containerRect.top;
+    }
+    
+    return { width, height, left, top };
+}
+
 // REAL-TIME VİZÖR GÜNCELLEME FONKSİYONU
 function updateROIOverlay() {
     let overlay = document.getElementById('roiVisualOverlay');
     
-    // Eğer görsel daire DOM'da yoksa dinamik olarak oluşturup stillendiriyoruz
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'roiVisualOverlay';
-        
-        // compContainer'ın pozisyonlama bağlamını (relative) garantiye alıyoruz
         compContainer.style.position = 'relative';
         
         overlay.style.position = 'absolute';
-        overlay.style.border = '2.5px dashed #ff7e5f'; // Turuncu kesikli çizgiler
-        overlay.style.background = 'rgba(255, 126, 95, 0.15)'; // Hafif turuncu şeffaf dolgu
+        overlay.style.border = '2.5px dashed #ff7e5f'; // Kesikli turuncu çizgiler
+        overlay.style.background = 'rgba(255, 126, 95, 0.15)'; // Hafif şeffaf dolgu
         overlay.style.boxShadow = '0 0 15px rgba(255, 126, 95, 0.6)'; // Parlama efekti
-        overlay.style.borderRadius = '50%';
-        overlay.style.pointerEvents = 'none'; // Resim karşılaştırma sürgüsünün engellenmesini önler
-        overlay.style.transform = 'translate(-50%, -50%)'; // Merkezi (X,Y) noktasına hizalar
-        overlay.style.zIndex = '999'; // En üstte görünmesini sağlar
+        overlay.style.borderRadius = '0px';
+        overlay.style.pointerEvents = 'none';
+        overlay.style.transform = 'translate(-50%, -50%)';
+        overlay.style.zIndex = '999';
         overlay.style.display = 'none';
         compContainer.appendChild(overlay);
     }
 
-    // ROI aktifse ve resim alanı görünür durumdaysa vizörü göster ve güncelle
     if (roiCheckbox && roiCheckbox.checked && compContainer.style.display !== 'none') {
         overlay.style.display = 'block';
         
-        // Konumlandırma (Yüzdesel)
-        const x = roiXSlider.value;
-        const y = roiYSlider.value;
-        overlay.style.left = `${x}%`;
-        overlay.style.top = `${y}%`;
+        // Resmin ekranda render edildiği gerçek koordinatları alıyoruz
+        const activeRect = getActiveImageRect();
+        const containerRect = compContainer.getBoundingClientRect();
 
-        // Boyutlandırma (Python backend'indeki "max(h, w)" ölçeklemesine birebir uyumlu piksel hesabı)
-        const r = parseFloat(roiRSlider.value);
-        const rect = compContainer.getBoundingClientRect();
-        const maxDim = Math.max(rect.width, rect.height);
-        const diameter = (r * 2 / 100) * maxDim;
+        // Resmin container içerisindeki göreceli konumunu buluyoruz
+        const imgLeftInContainer = activeRect.left - containerRect.left;
+        const imgTopInContainer = activeRect.top - containerRect.top;
+
+        // Yüzdesel konumları resmin gerçek boyutlarına dönüştürüyoruz
+        const cxPercent = parseFloat(roiXSlider.value) / 100.0;
+        const cyPercent = parseFloat(roiYSlider.value) / 100.0;
+        const rPercent = parseFloat(roiRSlider.value) / 100.0;
+
+        const centerX = imgLeftInContainer + cxPercent * activeRect.width;
+        const centerY = imgTopInContainer + cyPercent * activeRect.height;
+
+        // Vizörün merkezini hizalıyoruz
+        overlay.style.left = `${centerX}px`;
+        overlay.style.top = `${centerY}px`;
+
+        // Boyutlandırma (Backend ile birebir uyumlu piksel hesabı)
+        const maxDim = Math.max(activeRect.width, activeRect.height);
+        const sideLength = rPercent * 2 * maxDim;
         
-        overlay.style.width = `${diameter}px`;
-        overlay.style.height = `${diameter}px`;
+        overlay.style.width = `${sideLength}px`;
+        overlay.style.height = `${sideLength}px`;
+        overlay.style.borderRadius = '0px';
     } else {
         overlay.style.display = 'none';
     }

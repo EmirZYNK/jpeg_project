@@ -36,32 +36,35 @@ def apply_progressive_scalability(coeffs, decode_layers, level):
     return coeffs
 
 def apply_subband_roi(subband_matrix, cx, cy, r, q_step):
-    """
-    Slayt 98 ve 101'de açıklanan İlgi Bölgesi (ROI) maskelemesini DWT alt bandına uygular.
-    ROI alanı içindeki katsayıları SIFIR KAYIPLA (unquantized) aynen korur,
-    ROI dışındaki (arka plan) katsayıları ağır kuantize ederek flu hale getirir.
-    """
+    """ Slayt 98 ve 101'de açıklanan İlgi Bölgesi (ROI) maskelemesini DWT alt bandına uygular. 
+    Kare alanı içindeki katsayıları SIFIR KAYIPLA korur, dışını ağır kuantize eder. """
     h, w = subband_matrix.shape
     y_indices, x_indices = np.ogrid[:h, :w]
-    
+
     # Göreceli koordinatları alt bandın piksel boyutlarına uyarlıyoruz
     sub_cx = cx * w
     sub_cy = cy * h
     sub_r = r * max(h, w)
+
+    # Filtre kenar sızıntısını (bleeding) önlemek için katsayı maskesine güvenlik marjı ekliyoruz
+    safety_margin = 8  # DWT filtre boyutu taşmasını önlemek için tampon bölge
     
-    dist_sq = (x_indices - sub_cx)**2 + (y_indices - sub_cy)**2
-    inside_roi = dist_sq <= sub_r**2
-    
+    # KARE ROI Maskesi
+    inside_roi = (np.abs(x_indices - sub_cx) <= (sub_r + safety_margin)) & \
+                 (np.abs(y_indices - sub_cy) <= (sub_r + safety_margin))
+
     quantized = np.zeros_like(subband_matrix)
-    
-    # ROI İçi: Sıfır kuantizasyon (kayıpsız) uygulayarak orijinal pikselleri kusursuz netlikte koruyoruz!
+
+    # ROI İçi: Sıfır kuantizasyon (kayıpsız)
     quantized[inside_roi] = subband_matrix[inside_roi]
-    
+
     # ROI Dışı (Arka Plan): Ağır kuantizasyon uygulanarak yumuşatılır/blurlanır
-    heavy_step = q_step * 15.0  # Arka plandaki blurlanma farkını daha keskin hissettirmek için çarpanı 15.0 yaptık
+    heavy_step = q_step * 15.0
     quantized[~inside_roi] = np.round(subband_matrix[~inside_roi] / heavy_step) * heavy_step
-    
+
     return quantized
+
+
 
 def apply_roi_coding(coeffs, cx, cy, r, q_step):
     """
